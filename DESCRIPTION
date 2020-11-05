@@ -1,0 +1,34 @@
+Package: TranscriptomeReconstructoR
+Title: Data-driven Annotation of the Transcriptome
+Version: 0.9.0
+Authors@R: 
+    person(given = "Maxim",
+           family = "Ivanov",
+           role = c("aut", "cre"),
+           email = "aranarh@gmail.com",
+           comment = c(ORCID = "0000-0001-7548-3316"))
+Description: This package reconstructs the most probable gene/transcript model of a species 
+    by combining a few orthogonal Next-generation sequencing datasets. The three 
+    essential datasets are as follows: i) 5' tag RNA sequencing dataset which shows 
+    TSS (transcription start sites), e.g. CAGE; ii) 3' tag RNA sequencing dataset 
+    which shows PAS (polyadenylation sites); iii) Full-length RNA sequencing dataset 
+    which shows splicing patterns (e.g. Direct RNA-seq on Oxford Nanopore). 
+    Optionally, a nascent RNA-seq dataset (e.g. NET-seq or GRO-seq) can be added to 
+    resolve the transient non-coding transcripts.
+License: `use_gpl3_license()`
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Imports:
+    GenomicRanges,
+    GenomicAlignments,
+    rtracklayer,
+    tidyverse,
+    collections,
+    methods
+Suggests: 
+    knitr,
+    rmarkdown,
+    BiocStyle
+VignetteBuilder: knitr
