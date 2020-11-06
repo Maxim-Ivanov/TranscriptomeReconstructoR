@@ -163,7 +163,7 @@ extend_genes_along_nascent_intervals <- function(genes, tc, nascent, mode = "tss
   }
   out_1 <- genes[-S4Vectors::subjectHits(h1)]
   genes <- genes[S4Vectors::subjectHits(h1)]
-  win <- nascent[S4Vectors::queryHits(h1)] %>% GenomicRanges::resize(BiocGenerics::width(.) + abs(GenomicRanges::flanks[[mode]]), fix = ifelse(mode == "tss", "end", "start"))
+  win <- nascent[S4Vectors::queryHits(h1)] %>% GenomicRanges::resize(BiocGenerics::width(.) + abs(flanks[[mode]]), fix = ifelse(mode == "tss", "end", "start"))
   h2 <- GenomicRanges::findOverlaps(win, tc)
   if (length(h2) == 0) {
     message("\tDid not find any unused strong ", stringr::str_to_upper(mode), " inside of the ", ifelse(mode == "tss", "heads", "tails"), ";")
