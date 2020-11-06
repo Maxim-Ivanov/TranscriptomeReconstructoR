@@ -329,7 +329,7 @@ trim_by_down_or_upstream_features <- function(windows, features, mode, offset = 
       features <- suppressWarnings(GenomicRanges::trim(GenomicRanges::resize(features, width = width(features) + offset, fix = "start")))
     }
   }
-  over_any <- GenomicRanges::overlapsAny(windows, features, ignore.strand = ignore.strand)
+  over_any <- IRanges::overlapsAny(windows, features, ignore.strand = ignore.strand)
   out1 <- windows[!over_any] # exclude and save windows which do not overlap any feature
   win_rem <- windows[over_any]
   if (length(win_rem) == 0) {
