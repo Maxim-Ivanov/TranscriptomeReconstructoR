@@ -23,7 +23,7 @@ call_transcribed_intervals <- function(cov, min_signal = 3, max_gapwidth = 250, 
   cov_above <- cov[BiocGenerics::score(cov) >= min_signal]
   cov_below <- cov[BiocGenerics::score(cov) < min_signal]
   transcribed <- cov_above %>% GenomicRanges::reduce(min.gapwidth = max_gapwidth) %>% `[`(BiocGenerics::width(.) >= min_width)
-  gaps <- cov_below %>% GenomicRanges::reduce() %>% GenomicRanges::subsetByOverlaps(transcribed)
+  gaps <- cov_below %>% GenomicRanges::reduce() %>% IRanges::subsetByOverlaps(transcribed)
   return(list("transcribed" = transcribed, "gaps" = gaps))
 }
 
