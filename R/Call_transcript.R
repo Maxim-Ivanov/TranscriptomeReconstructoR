@@ -211,7 +211,7 @@ find_fusion_tx <- function(gr1, gr2 = NULL, min_overlap_fusion = 0.5, skip = TRU
       return(integer(0))
     }
   }
-  fusion_idx <- hits %>% BiocGenerics::queryHits() %>% BiocGenerics::unique()
+  fusion_idx <- hits %>% S4Vectors::queryHits() %>% BiocGenerics::unique()
   return(fusion_idx)
 }
 
@@ -220,7 +220,7 @@ find_fusion_tx <- function(gr1, gr2 = NULL, min_overlap_fusion = 0.5, skip = TRU
 call_tu <- function(tx, clust_threshold) {
   gr <- tx %>% range() %>% BiocGenerics::unlist()
   hits <- GenomicRanges::findOverlaps(gr, gr)
-  hits <- hits[queryHits(hits) < subjectHits(hits)]
+  hits <- hits[S4Vectors::queryHits(hits) < S4Vectors::subjectHits(hits)]
   par1 <- gr[S4Vectors::queryHits(hits)]
   par2 <- gr[S4Vectors::subjectHits(hits)]
   valid <- BiocGenerics::width(GenomicRanges::pintersect(par1, par2)) / BiocGenerics::width(GenomicRanges::punion(par1, par2)) >= clust_threshold # nested transcripts remain unmerged
