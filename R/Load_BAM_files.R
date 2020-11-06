@@ -53,7 +53,7 @@ load_BAM_files <- function(bamfiles, mode, ngs_mode = "SE", skip_split_aln = TRU
 
 extract_first_or_last_element <- function(nested_list, mode = "first") {
   unlisted <- BiocGenerics::unlist(nested_list)
-  idx <- rep(1:length(nested_list), times = s4Vectors::elementNROWS(nested_list))
+  idx <- rep(1:length(nested_list), times = S4Vectors::elementNROWS(nested_list))
   if (mode == "first") {
     choose <- !BiocGenerics::duplicated(idx)
   } else if (mode == "last") {
