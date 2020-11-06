@@ -151,7 +151,7 @@ find_alignment_errors <- function(const_exons, all_exons, allow_exitrons = FALSE
   # Exons which do not overlap with any constitutive exon:
   lgl_2 <- all_exons %outside% const_exons
   # Exons which precisely overlap any constitutive exon:
-  lgl_3 <- GenomicRanges::overlapsAny(all_exons, const_exons, type = "equal")
+  lgl_3 <- IRanges::overlapsAny(all_exons, const_exons, type = "equal")
   # Exons which start in one constitutive exon and end in another (IR events):
   lgl_4 <- GenomicRanges::resize(all_exons, 1, "start") %over% GenomicRanges::resize(const_exons, 1, "start") & GenomicRanges::resize(all_exons, 1, "end") %over% GenomicRanges::resize(const_exons, 1, "end")
   lgl <- lgl_1 | lgl_2 | lgl_3 | lgl_4
