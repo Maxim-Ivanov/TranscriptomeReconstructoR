@@ -106,7 +106,7 @@ call_transcripts_and_genes <- function(long_reads, skip_minor_tx = 0.005, max_ov
   message("\t", length(lc_tx), " LC transcripts in ", length(lc_genes), " LC genes;")
   hml_tx <- c(hc_tx, mc_tx, lc_tx) %>% sort_grl()
   # Find more fusion reads among unused reads by overlap with called HC, MC and LC genes:
-  fusion_idx <- reads_unused %>% GenomicRanges::range() %>% BiocGenerics::unlist() %>% find_fusion_tx(hml_genes, skip = FALSE)
+  fusion_idx <- reads_unused %>% range() %>% BiocGenerics::unlist() %>% find_fusion_tx(hml_genes, skip = FALSE)
   reads_fusion <- reads_unused %>% `[`(fusion_idx) %>% BiocGenerics::unlist(use.names = FALSE) %>% `[`(S4Vectors::mcols(.)$complete) %>% S4Vectors::split(S4Vectors::mcols(.)$read_id) %>% sort_grl()
   # Convert them to new fusion transcripts:
   reads_fusion_dedup <- deduplicate_grl(reads_fusion)
@@ -150,7 +150,7 @@ call_transcripts <- function(all_exons, prefix) {
 find_free_reads <- function(exons, genes, max_overlap_called, min_read_width) {
   exons <- exons[BiocGenerics::order(S4Vectors::mcols(exons)$exon_id)]
   reads <- S4Vectors::split(exons, S4Vectors::mcols(exons)$read_id)
-  gr <- reads %>% GenomicRanges::range() %>% BiocGenerics::unlist()
+  gr <- reads %>% range() %>% BiocGenerics::unlist()
   over <- gr %over% genes
   hits <- GenomicRanges::findOverlaps(gr, genes)
   par1 <- gr[S4Vectors::queryHits(hits)]
@@ -218,7 +218,7 @@ find_fusion_tx <- function(gr1, gr2 = NULL, min_overlap_fusion = 0.5, skip = TRU
 #------------------------------------------------------------------------------------------------------------------
 
 call_tu <- function(tx, clust_threshold) {
-  gr <- tx %>% GenomicRanges::range() %>% BiocGenerics::unlist()
+  gr <- tx %>% range() %>% BiocGenerics::unlist()
   hits <- GenomicRanges::findOverlaps(gr, gr)
   hits <- hits[queryHits(hits) < subjectHits(hits)]
   par1 <- gr[S4Vectors::queryHits(hits)]

@@ -68,7 +68,7 @@ filter_ga_by_terminal_subalignments <- function(ga, abs_threshold, rel_threshold
   grl <- GenomicRanges::grglist(ga)
   spl <- S4Vectors::elementNROWS(grl) >= 2
   grl_spl <- grl[spl]
-  unal <- GenomicRanges::psetdiff(BiocGenerics::unlist(GenomicRanges::range(grl_spl)), grl_spl)
+  unal <- GenomicRanges::psetdiff(BiocGenerics::unlist(range(grl_spl)), grl_spl)
   w_aln <- BiocGenerics::width(grl_spl)
   w_unal <- BiocGenerics::width(unal)
   first_aln <- extract_first_or_last_element(w_aln)

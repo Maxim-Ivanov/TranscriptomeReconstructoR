@@ -54,7 +54,7 @@ refine_transcripts_by_annotation <- function(hml_tx, annot_exons, tss, pas, fusi
   hml_tx <- extend_called_transcripts(hml_tx, annot_exons, tss, mode = "start", min_score_2 = min_score_2, min_tx_cov = min_tx_cov)
   hml_tx <- extend_called_transcripts(hml_tx, annot_exons, pas, mode = "end", min_score_2 = min_score_2, min_tx_cov = min_tx_cov)
   # Update HC/MC/LC classification:
-  hml_range <- hml_tx %>% GenomicRanges::range() %>% BiocGenerics::unlist(use.names = FALSE)
+  hml_range <- hml_tx %>% range() %>% BiocGenerics::unlist(use.names = FALSE)
   start_in_tss <- GenomicRanges::resize(hml_range, 1, "start") %over% tss
   end_in_pas <- GenomicRanges::resize(hml_range, 1, "end") %over% pas
   type <- ifelse(start_in_tss & end_in_pas, "HC", ifelse(start_in_tss | end_in_pas, "MC", "LC"))
@@ -62,7 +62,7 @@ refine_transcripts_by_annotation <- function(hml_tx, annot_exons, tss, pas, fusi
   S4Vectors::mcols(hml_unl)$type <- rep(type, times = S4Vectors::elementNROWS(hml_tx))
   hml_tx <- BiocGenerics::relist(hml_unl, hml_tx)
   # Find annotated transcripts with both TSS and PAS:
-  annot_range <- annot_exons %>% GenomicRanges::range() %>% BiocGenerics::unlist(use.names = FALSE)
+  annot_range <- annot_exons %>% range() %>% BiocGenerics::unlist(use.names = FALSE)
   annot_start <- GenomicRanges::resize(annot_range, 1, "start")
   annot_end <- GenomicRanges::resize(annot_range, 1, "end")
   valid_tss <- tss[BiocGenerics::score(tss) >= min_score_2]
@@ -86,7 +86,7 @@ refine_transcripts_by_annotation <- function(hml_tx, annot_exons, tss, pas, fusi
     fusion_tx <- c(fusion_tx, new_fusion)
     fusion_tu <- fusion_tx %>% call_tu(clust_threshold = clust_threshold) %>% skip_nested()
     hml_tx <- hml_tx[-idx2]
-    hml_range <- hml_tx %>% GenomicRanges::range() %>% BiocGenerics::unlist(use.names = FALSE)
+    hml_range <- hml_tx %>% range() %>% BiocGenerics::unlist(use.names = FALSE)
   } else {
     message("Did not find new fusion transcripts;")
     if (length(fusion_tx) > 0) {
@@ -96,7 +96,7 @@ refine_transcripts_by_annotation <- function(hml_tx, annot_exons, tss, pas, fusi
     }
   }
   # Find annotated transcripts which do not overlap with called ones:
-  annot_range <- annot_hc %>% GenomicRanges::range() %>% BiocGenerics::unlist(use.names = FALSE)
+  annot_range <- annot_hc %>% range() %>% BiocGenerics::unlist(use.names = FALSE)
   annot_good <- annot_hc[annot_range %outside% hml_range]
   if (length(annot_good) > 0) {
     message("Found ", length(annot_good), " annotated transcripts with TSS and PAS which were absent from the called set;")
@@ -151,14 +151,14 @@ extend_called_transcripts <- function(hml_tx, annot_exons, tc, mode, min_score_2
   stopifnot(class(tc) == "GRanges" && !is.null(score(tc)))
   # (known transcripts are expected to be already extended to summits of nearby TSS and PAS)
   # Skip known transcripts which do not have a valid TC:
-  annot_tx_border <- annot_exons %>% GenomicRanges::range() %>% BiocGenerics::unlist() %>% GenomicRanges::resize(1, mode)
+  annot_tx_border <- annot_exons %>% range() %>% BiocGenerics::unlist() %>% GenomicRanges::resize(1, mode)
   valid_tc <- tc[BiocGenerics::score(tc) >= min_score_2]
   annot_exons_good <- annot_exons[annot_tx_border %over% valid_tc]
   # Enumerate the called transcripts:
   old_names <- names(hml_tx)
   names(hml_tx) <- 1:length(hml_tx)
   # Find called transcripts which lack TC:
-  called_tx_border <- hml_tx %>% GenomicRanges::range() %>% BiocGenerics::unlist() %>% GenomicRanges::resize(1, mode)
+  called_tx_border <- hml_tx %>% range() %>% BiocGenerics::unlist() %>% GenomicRanges::resize(1, mode)
   over_tc <- called_tx_border %over% tc
   out_1 <- hml_tx[over_tc]
   other <- hml_tx[!over_tc] ####################################################### there can be some HC guys... Check where do they come from!
@@ -210,8 +210,8 @@ extend_called_transcripts <- function(hml_tx, annot_exons, tc, mode, min_score_2
   par1 <- par1[best_mutual] # == other
   par2 <- par2[best_mutual]
   # Check that the annotated transcript extends the called one, not shrinks it:
-  par1_border <- par1 %>% GenomicRanges::range() %>% BiocGenerics::unlist(use.names = FALSE) %>% GenomicRanges::resize(1, mode)
-  par2_border <- par2 %>% GenomicRanges::range() %>% BiocGenerics::unlist(use.names = FALSE) %>% GenomicRanges::resize(1, mode)
+  par1_border <- par1 %>% range() %>% BiocGenerics::unlist(use.names = FALSE) %>% GenomicRanges::resize(1, mode)
+  par2_border <- par2 %>% range() %>% BiocGenerics::unlist(use.names = FALSE) %>% GenomicRanges::resize(1, mode)
   decision <- check_gr_up_down(par1_border, par2_border)
   if (mode == "start") {
     good <- decision == "up" # annotated border (par2) is upstream from the called border (par1)

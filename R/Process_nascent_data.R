@@ -128,11 +128,11 @@ process_nascent_intervals <- function(hml_genes, nascent, tss, pas, reads_free =
   hml_genes_with_fl <- hml_genes %>% decorate_genes(heads, mode = "up") %>% decorate_genes(tails, mode = "down")
   if (is.null(reads_free)) {
     # Merge lncRNAs if connected by a free_read:
-    range_free <- reads_free %>% GenomicRanges::range() %>% BiocGenerics::unlist(use.names = FALSE)
+    range_free <- reads_free %>% range() %>% BiocGenerics::unlist(use.names = FALSE)
     range_over_lncrna <- range_free[GenomicRanges::countOverlaps(range_free, lncrna) >= 2] %>% GenomicRanges::reduce()
     if (length(range_over_lncrna) > 0) {
       hits <- GenomicRanges::findOverlaps(range_over_lncrna, lncrna)
-      lncrna_p1 <- lncrna[S4Vectors::subjectHits(hits)] %>% S4Vectors::split(S4Vectors::queryHits(hits)) %>% GenomicRanges::range() %>% BiocGenerics::unlist() %>% unname()
+      lncrna_p1 <- lncrna[S4Vectors::subjectHits(hits)] %>% S4Vectors::split(S4Vectors::queryHits(hits)) %>% range() %>% BiocGenerics::unlist() %>% unname()
       lncrna_p2 <- lncrna[-S4Vectors::subjectHits(hits)]
       lncrna <- c(lncrna_p1, lncrna_p2) %>% BiocGenerics::sort()
     }

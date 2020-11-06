@@ -25,7 +25,6 @@ extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-
   stopifnot(is.numeric(trunc_limit) && length(trunc_limit) == 1 && trunc_limit %% 1 == 0 && trunc_limit > 0)
   stopifnot(is.logical(verbose) && length(verbose) == 1)
   if (mode == "transcripts") {
-    old_names <- names(grl)
     old_mcols <- grl %>% BiocGenerics::unlist(use.names = FALSE) %>% S4Vectors::mcols()
   }
   # Annotate read/tx exons with their indexes and relative positions:
@@ -33,7 +32,7 @@ extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-
   # Analyze intersections of reads/tx with TSS and PAS:
   if (isTRUE(verbose)) {
     message(length(grl), " input ", mode, ";")
-    raw_range <- grl %>% GenomicRanges::range() %>% BiocGenerics::unlist()
+    raw_range <- grl %>% range() %>% BiocGenerics::unlist()
     over_tss <- GenomicRanges::resize(raw_range, 1, "start") %over% tss
     message("\t", sum(over_tss), " of them start in TSS;")
     over_pas <- GenomicRanges::resize(raw_range, 1, "end") %over% pas
@@ -44,12 +43,12 @@ extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-
   all_exons <- all_exons %>% extend_reads(tc = tss, mode = "tss", flank_out = abs(read_flanks_up[[1]]), flank_in = abs(read_flanks_up[[2]]), trunc_limit = trunc_limit)
   if (isTRUE(verbose)) {
     w0 <- BiocGenerics::width(raw_range)
-    w1 <- all_exons %>% S4Vectors::split(S4Vectors::mcols(.)$read_id) %>% GenomicRanges::range() %>% BiocGenerics::unlist() %>% BiocGenerics::width()
+    w1 <- all_exons %>% S4Vectors::split(S4Vectors::mcols(.)$read_id) %>% range() %>% BiocGenerics::unlist() %>% BiocGenerics::width()
     message(sum(w1 != w0), " ", mode, " were extended to summits of nearby TSS;")
   }
   all_exons <- all_exons %>% extend_reads(tc = pas, mode = "pas", flank_out = abs(read_flanks_down[[2]]), flank_in = abs(read_flanks_down[[1]]), trunc_limit = trunc_limit)
   grl <- all_exons %>% S4Vectors::split(S4Vectors::mcols(.)$read_id)
-  new_range <- grl %>% GenomicRanges::range() %>% BiocGenerics::unlist()
+  new_range <- grl %>% range() %>% BiocGenerics::unlist()
   if (isTRUE(verbose)) {
     w2 <- BiocGenerics::width(new_range)
     message(sum(w2 != w1), " ", mode, " were extended to summits of nearby PAS;")
@@ -111,7 +110,7 @@ extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-
   }
   exons_trunc <- all_exons_2[trunc]
   reads_trunc <- S4Vectors::split(exons_trunc, S4Vectors::mcols(exons_trunc)$read_id)
-  range_trunc <- reads_trunc %>% GenomicRanges::range() %>% BiocGenerics::unlist()
+  range_trunc <- reads_trunc %>% range() %>% BiocGenerics::unlist()
   # Group by overlap, not by TSS/PAS indexes:
   groups <- GenomicRanges::reduce(range_trunc)
   support <- GenomicRanges::countOverlaps(groups, range_trunc)

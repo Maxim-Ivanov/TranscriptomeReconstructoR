@@ -36,7 +36,7 @@ save_GRanges_as_bedGraph <- function(gr, filepath, colname = "score") {
 #' If \code{name_in_mcols == TRUE}, then the \code{S4Vectors::mcols(grl)$name} is exported as range names (otherwise the \code{names(grl)} is used).
 #' @export
 write_grl_as_bed12 <- function(grl, filename, name_in_mcols = FALSE) {
-  gr <- GenomicRanges::range(grl) %>% BiocGenerics::unlist(use.names = FALSE)
+  gr <- range(grl) %>% BiocGenerics::unlist(use.names = FALSE)
   grl_unl <- BiocGenerics::unlist(grl, use.names = FALSE)
   idx_fw <- BiocGenerics::lapply(S4Vectors::elementNROWS(grl), function(x) { seq(1, x) }) %>% BiocGenerics::unlist() %>% unname()
   idx_rev <- BiocGenerics::lapply(S4Vectors::elementNROWS(grl), function(x) { seq(x, 1) }) %>% BiocGenerics::unlist() %>% unname()
@@ -167,7 +167,7 @@ poverlaps_gr <- function(gr1, gr2, maxgap = 0L, minoverlap = 1L, type = c("any",
 sort_grl <- function(grl) {
   orig_names <- names(grl)
   names(grl) <- 1:length(grl)
-  nms <- grl %>% GenomicRanges::range() %>% BiocGenerics::unlist() %>% BiocGenerics::sort() %>% names()
+  nms <- grl %>% range() %>% BiocGenerics::unlist() %>% BiocGenerics::sort() %>% names()
   idx <- BiocGenerics::match(nms, names(grl))
   out <- grl[idx]
   names(out) <- orig_names[idx]
