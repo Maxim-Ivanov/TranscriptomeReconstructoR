@@ -26,6 +26,7 @@ extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-
   stopifnot(is.logical(verbose) && length(verbose) == 1)
   if (mode == "transcripts") {
     old_mcols <- grl %>% BiocGenerics::unlist(use.names = FALSE) %>% S4Vectors::mcols()
+    old_names <- names(grl)
   }
   # Annotate read/tx exons with their indexes and relative positions:
   all_exons <- grl %>% add_mcols_to_grl() %>% BiocGenerics::unlist(use.names = FALSE)
