@@ -146,6 +146,9 @@ process_nascent_intervals <- function(hml_genes, nascent, tss, pas, reads_free =
       lncrna <- c(lncrna_p1, lncrna_p2) %>% BiocGenerics::sort()
     }
   }
+  # Ensure that all lncRNAs have at least <trim_offset> gap with the nearest genes (both up- and downstream):
+  lncrna <- lncrna %>% trim_by_down_or_upstream_features(hml_genes, mode = "down", offset = trim_offset) %>%
+    trim_by_down_or_upstream_features(hml_genes, mode = "up", offset = trim_offset)
   # Prepare the output:
   S4Vectors::mcols(lncrna)$score <- 0
   S4Vectors::mcols(lncrna)$type <- "Nascent"
