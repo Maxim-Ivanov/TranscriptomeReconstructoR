@@ -36,7 +36,7 @@ save_GRanges_as_bedGraph <- function(gr, filepath, colname = "score") {
 #' If \code{name_in_mcols == TRUE}, then the \code{S4Vectors::mcols(grl)$name} is exported as range names (otherwise the \code{names(grl)} is used).
 #' @export
 write_grl_as_bed12 <- function(grl, filename, name_in_mcols = FALSE) {
-  stopifnot(BiocGenerics::grepl("GRangesList", class(gr_list)))
+  stopifnot(BiocGenerics::grepl("GRangesList", class(grl)))
   stopifnot(is.character(filename) && length(filename) == 1)
   stopifnot(is.logical(name_in_mcols) && length(name_in_mcols) == 1)
   gr <- range(grl) %>% BiocGenerics::unlist(use.names = FALSE)
