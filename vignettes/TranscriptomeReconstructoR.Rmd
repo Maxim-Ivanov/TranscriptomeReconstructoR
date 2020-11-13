@@ -547,12 +547,9 @@ The remaining long reads are collapsed into transcripts. The transcripts are cla
      \item MC transcripts are called from TSS-only or PAS-only reads which do not overlap with any HC transcript by more than \code{max_overlap_called} fraction of either read or transcript length;
      \item LC transcripts are called from reads which neither start in a TSS nor end in a PAS, and do not overlap with any HC or MC transcript by mode than \code{max_overlap_called}.
  }
- This iterative procedure of transcript calling ensures that highly expressed HC loci are not contaminated with less reliable MC or LC transcripts.
- The MC/LC transcripts are not guaranteed to be full-length. To decrease the risk of picking up products of partial RNA degradation, MC and LC transcripts
- can be called only from reads longer than \code{min_read_length} bp.\cr
- The called HC, MC and LC transcripts are clustered into HC, MC and LC genes, respectively. A pair of transcripts of the same type having overlap (intersect/union) above the \code{clust_threshold}
- are considered belonging to the same gene.\cr
- Within each gene, the minor transcripts (collectively representing up to \code{skip_minor_tx} fraction of the reads) are skipped from further consideration. To suppress this behavior, set \code{skip_minor_tx = NULL}.\cr
+ This iterative procedure of transcript calling ensures that highly expressed HC loci are not contaminated with less reliable MC or LC transcripts. The MC and LC transcripts can be called only in those loci where the full-length reads are lacking. To decrease the risk of picking up products of partial RNA degradation, MC and LC transcripts can be called only from reads longer than \code{min_read_length} bp.\cr
+ The called HC, MC and LC transcripts are clustered into HC, MC and LC genes, respectively. A pair of transcripts of the same type having overlap (intersect/union) above the \code{clust_threshold} are considered belonging to the same gene.\cr
+ Within each gene, the minor transcripts (collectively representing up to \code{skip_minor_tx} fraction of the supporting reads) are skipped. This is done to decrease the risk of calling artifact alternative transcripts in highly expressed genes (assuming that undetected alignment errors are relatively rare events). This behavior can be suppressed by setting \code{skip_minor_tx = NULL}.\cr
  Finally, transcripts which overlap at least two other disjoint transcripts by at least \code{min_overlap_fusion} fraction of their lengths, are considered fusion transcripts.
 
 The `call_transcripts_and_genes()` function returns a *List* of *GRanges* and *GRangesList* objects which contain the called HC, MC and LC genes and transcripts, fusion genes and transcripts, as well as the "free" reads.
