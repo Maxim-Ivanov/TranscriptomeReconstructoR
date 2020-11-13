@@ -36,21 +36,21 @@ devtools::load_all(".")
 
 The *TranscriptomeReconstructoR* package implements a pipeline which allows for *de novo* assembly of transcriptomes by combining data from a few mutually orthogonal datasets:
 
-1. Stranded full-length RNA sequencing (e.g. Direct RNA-seq by Oxford Nanopore);
-2. 5'-tag RNA sequencing (e.g. CAGE-seq);
-3. 3'-tag sequencing (e.g. PAT-seq);
-4. (optionally) Nascent RNA-seq (e.g. NET-seq).
+1. Stranded full-length RNA sequencing (e.g. ONT Direct RNA-seq or PacBio Iso-Seq);
+2. 5'-tag RNA sequencing (e.g. CAGE-seq or TSS-seq);
+3. 3'-tag sequencing (e.g. PAT-seq or 3'READS);
+4. (optionally) Nascent RNA-seq (e.g. NET-seq, GRO-seq or chrRNA-seq).
 
-Observe that all input datasets are expected be stranded, i.e. strand orientation of a read must correspond to strand orientation of the original RNA molecule. This means that certain library preparation protocols for 3^rd^ generation RNA sequencing may be not compatible with the pipeline (or may require an additional pre-processing step to recover the strand information). For more details on the various full-length RNA-seq methods, see **Appendix 3**.
+Observe that all input datasets are expected to be stranded, i.e. strand orientation of a read must correspond to strand orientation of the original RNA molecule. This means that certain library preparation protocols for Third generation RNA sequencing may be not compatible with the pipeline (or may require an additional pre-processing step to recover the strand information). For more details on the various full-length RNA-seq methods, see **Appendix 1**.
 
-The full-length RNA-seq provides information on exon-intron structure of the original RNA transcripts. However, the long reads from 3^rd^ generation sequencing platforms (both ONT and PacBio) suffer from certain biases, in particular high error rate and truncated 5'-ends. The high error rate inevitably results in lower accuracy of alignments. Therefore, a long read cannot be interpreted as a *bona fide* transcript isoform.
+The full-length RNA-seq provides information on exon-intron structure of the original RNA transcripts. However, the long reads from Third generation sequencing platforms (both ONT and PacBio) suffer from certain biases, in particular high error rate and truncated 5'-ends. The high error rate inevitably results in lower accuracy of alignments. Therefore, a long read cannot be interpreted as a *bona fide* transcript isoform.
 
 *TranscriptomeReconstructoR* aims to compensate for sequencing and alignment errors of long reads by:
 
 * Extracting common features from multiple long reads originating from the same isoform;
 * Correcting truncated 5'- and 3'-end of long reads by TSS and PAS coordinates which are derived from independent 5'- and 3'-tag sequencing datasets, respectively;
 
-The pipeline returns gene and transcript models which were called from experimental data and thus are agnostic to any existing annotation. However, the resultant *de novo* transcriptome assembly may be refined by an existing annotation, if desired (see **Appendix 1**). In addition, *TranscriptomeReconstructoR* can supplement the transcriptome assembly by transient and/or non-polyadenylated transcripts (given that a nascent RNA-seq dataset was included).
+The pipeline returns gene and transcript models which are called from experimental data and thus are agnostic to any existing annotation. However, the resultant *de novo* transcriptome assembly may be refined by an existing annotation, if desired (see **Appendix 2**). In addition, *TranscriptomeReconstructoR* can supplement the transcriptome assembly by transient and/or non-polyadenylated transcripts (given that a nascent RNA-seq dataset was included).
 
 *TranscriptomeReconstructoR* can be used to assemble draft transcriptomes of newly sequenced organisms, as well as to validate the existing gene annotations.
 
@@ -66,9 +66,9 @@ devtools::install_github("Maxim-Ivanov/TranscriptomeReconstructoR",
                          build_vignettes = TRUE)
 ```
 
-Then load the installed package:
+Then attach the installed package:
 
-```{r setup, eval = FALSE}
+```{r setup_1, eval = FALSE}
 library(TranscriptomeReconstructoR)
 ```
 
@@ -81,7 +81,7 @@ library(TranscriptomeReconstructoR)
 * PAT-seq from @yu2019;
 * plaNET-seq from @kindgren2020.
 
-For more details on downloading, pre-processing and alignment of the raw sequencing data, **see Appendix 2**. The BAM files were subsetted to a 300Kb interval on chromosome 1 (1:10,000,000-10,300,000). To retrieve the filenames, run the following code:
+For more details on downloading, pre-processing and alignment of the raw sequencing data, **see Appendix 3**. The BAM files were subsetted to a 300Kb interval on chromosome 1 (1:10,000,000-10,300,000). To retrieve the filenames, run the following code:
 
 ```{r filenames}
 pkg <- "TranscriptomeReconstructoR"
@@ -104,6 +104,12 @@ When running the pipeline on other datasets, use the `list.files(full.names = TR
 # Usage
 The pipeline consists of a few steps which have to be executed sequentially. For a more detailed explanation of the underlying algorithm, see **Appendix 4**.
 
+First of all, attach the libraries which are used at the top level of the example pipeline:
+```{r setup_2, eval = FALSE}
+library(rtracklayer)
+library(magrittr)
+```
+
 ## Load BAM files:
 
 The `load_BAM_files()` function takes a vector of BAM filenames as input and imports BAM data into R session as *GRanges* or *GRangesList* objects. The most important argument is `mode`:
@@ -123,9 +129,7 @@ nascent_data <- load_BAM_files(nascent_bamfiles,
 Optionally, one may wish to export the loaded NGS data as bedGraph/BED12 tracks for visualization in a genome browser:
 
 ```{r export_tracks, eval = FALSE}
-# For faster access, "bgzip" and "tabix -p bed" the saved BED12 file:
 write_grl_as_bed12(long_reads, "Long_reads.bed")
-# If using IGV browser, consider to convert the saved bedGraph files to TDF:
 tss_data %>% merge_GRanges() %>% 
   save_GRanges_as_bedGraph("TSS_data_merged.bedgraph.gz")
 pas_data %>% merge_GRanges() %>% 
@@ -137,9 +141,20 @@ save_GRanges_as_bedGraph(nascent_data,
 The bedGraph files produced by the `save_GRanges_as_bedGraph()` function are stranded, i.e. encode coverage on the forward (Watson) and reverse (Crick) strands as positive and negative values, respectively. It is important to ensure that the strand information of the input data was processed correctly. If the sequencing coverage is observed always on the opposite strand with respect to known genes, then the strand orientation of such *GRanges* or *GRangesList* object is probably wrong and has to be flipped by the `flip_strand_info()` function.
 
 For faster access to the large BED12 file produced by the `write_grl_as_bed12()` function, we recommend to compress and index it (outside of the R session):
-```{bash index_bed12, eval = FALSE, class.source = "fold-hide"}
+```{bash index_bed12, eval = FALSE}
 file="Long_reads.bed"; bgzip $file && tabix -p bed ${file}.gz && rm $file
 ```
+
+If using IGV browser, consider to convert the large bedGraph files produced by the `save_GRanges_as_bedGraph()` function to the TDF format:
+```{r chrom_sizes, eval = FALSE, }
+nascent_data %>% seqlengths() %>% as_tibble(rownames = "chr") %>% 
+  write_tsv("chrom_sizes", col_names = FALSE)
+```
+
+```{bash convert_bg, eval = FALSE}
+igvtools totdf Nascent_data_merged.bedgraph.gz Nascent_data_merged.tdf chrom_sizes
+```
+
 
 ## Call TSS and PAS
 The `call_TCs()` function finds genomic coordinates of transcription start sites (TSS) and polyadenylation sites (PAS) from the 5'- and 3'-tag sequencing data, respectively. It returns a *GRanges* object with numeric `score` metadata column which shows the "strength" of TSS or PAS:
@@ -156,7 +171,7 @@ rtracklayer::export(tss, "TSS.bed", format = "BED")
 rtracklayer::export(pas, "PAS.bed", format = "BED")
 ```
 
-If by any reason you are not satisfied with the results of peak calling, then changing the default values of arguments to `call_TCs` is recommended. In particular, if the input data are noisy (have high non-specific background), then the results may be improved by using higher `min_tpm`, `q_trim` and `min_score` values. Alternatively, any other peak calling software can be used instead of `call_TCs` (e.g. `r Biocpkg("CAGEr")` or `r Biocpkg("CAGEfightR")`), given that the output is converted to *GRanges* with a valid `score` column.
+If by any reason you are not satisfied with the results of peak calling, then changing the default values of `call_TCs` arguments is recommended. In particular, if the input data are noisy (i.e. have high non-specific background), then the results may be improved by using higher `min_tpm`, `q_trim` and `min_score` values. Alternatively, any other peak calling software can be used instead of `call_TCs` (e.g. `r Biocpkg("CAGEr")` or `r Biocpkg("CAGEfightR")`), given that the output is converted to *GRanges* with a valid `score` column.
 
 ## Extend long reads towards nearby TSS and PAS
 
@@ -168,7 +183,7 @@ long_reads_2 <- extend_long_reads_to_TSS_and_PAS(long_reads, tss, pas)
 
 ## Adjust exon borders
 
-Since long reads from 3^rd^ generation sequencing platforms in general have higher error rates than the short Illumina reads, the alignments may be relatively inaccurate. In particular, borders of exonic subalignments in long reads are often "fuzzy". To decrease the number of artifactual alternative exons differing by one or few basepairs, we suggest to use the `adjust_exons_of_long_reads()` function:
+Since long reads from Third generation sequencing platforms in general have higher error rates than the short Illumina reads, the alignments may be relatively inaccurate. In particular, borders of exonic subalignments in long reads are often "fuzzy". To decrease the number of artifactual alternative exons differing by only a few basepairs, we suggest to use the `adjust_exons_of_long_reads()` function:
 
 ```{r adjust_exons}
 long_reads_3 <- adjust_exons_of_long_reads(long_reads_2)
@@ -178,7 +193,7 @@ This step is optional and can be omitted.
 
 ## Detect alignment errors
 
-Minimap2, the most popular aligner for 3^rd^ generation sequencing data, is prone to under-split the full-length RNA-seq reads. Two adjacent exons may appear as a single subalignments in certain reads, whereas as individual subalignents in other reads in the same locus. This effect is most probably due to the relatively low cost for a mismatch between query and template in the long read aligners (thus, the cost for opening an intronic gap may exceed the cost for erroneously extending the previous exon). This specific kind of alignment artifacts can be found by the `detect_alignment_errors()` function:  
+Minimap2, the most popular aligner for Third generation sequencing data, is prone to under-split the full-length RNA-seq reads. Two adjacent exons may appear as a single subalignments in certain reads, whereas as individual subalignments in other reads in the same locus. This effect is most probably due to the relatively low cost for a mismatch between query and template in the long read aligners (as a result, the cost for opening an intronic gap may exceed the cost for erroneously extending the previous exon). This specific kind of alignment artifacts can be found by the `detect_alignment_errors()` function:  
 
 ```{r detect_errors}
 long_reads_4 <- detect_alignment_errors(long_reads_3)
@@ -216,7 +231,7 @@ Transcripts with sufficiently strong overlap are combined into genes. Transcript
 
 ## Add intervals of nascent transcription
 
-Both the full-length RNA-seq and the 5'- and 3'-tag sequencing methods detect mature RNA transcripts; moreover, they often depend on the poly(A) tail. However, eukaryotic genomes are pervasively transcribed, thus producing many non-coding RNA species which are often transient and/or non-polyadenylated. Such ncRNA species may avoid detection by the conventional RNA sequencing methods, however they become visible in nascent RNA sequencing data (NET-seq, GRO-seq, TT-seq etc). In this tutorial we will use plaNET-seq ("plant NET-seq") dataset from @kindgren2020, as described above.
+Both the full-length RNA-seq and the 5'- and 3'-tag sequencing methods can only detect mature RNA transcripts. Moreover, they often depend on the poly(A) tail. However, eukaryotic genomes are pervasively transcribed, thus producing many non-coding RNA species which are often transient and/or non-polyadenylated. Such ncRNA species may avoid detection by the conventional RNA sequencing methods, however they become visible in nascent RNA sequencing datasets (NET-seq, GRO-seq, TT-seq, chrRNA-seq etc). In this tutorial we will use plaNET-seq ("plant NET-seq") dataset from @kindgren2020, as described above.
 
 The first step is to call continuous intervals of nascent transcription from the imported nascent RNA-seq data by the `call_transcribed_intervals()` function:
 
@@ -234,9 +249,15 @@ The second step is to interleave the intervals of nascent transcription with the
 results <- process_nascent_intervals(hml_genes, transcribed, 
                                      tss, pas, reads_free, gaps)
 hml_genes_v2 <- results[[1]]
-hml_genes_v2_with_flanks <- results[[2]]
+hml_genes_v2_RT <- results[[2]]
 lncrna <- results[[3]]
 ```
+
+The returned *GRanges* object are as follows:
+
+1. The `hml_genes_v2` is almost identical to the input `hml_genes`, except that some MC and LC genes could have found their missing TSS and/or PAS by extension of the gene borders along the adjacent intervals of nascent transcription;
+1. The *thick* coordinates of genes in `hml_genes_v2_RT` are identical to the *granges* in `hml_genes_v2` described above. However the *granges* in `hml_genes_v2_RT` represent the union of called genes with their readthrough (RT) tails of nascent transcription;
+1. The `lncrna` object contains antisense and intergenic nascent transcripts which are considered as transient and/or non-polyadenylated lncRNAs. 
 
 ## Export the results
 
@@ -244,26 +265,50 @@ The results of the pipeline can be exported as BED files for visualization in ge
 
 ```{r export_results, eval = FALSE}
 rtracklayer::export(hml_genes_v2, "Called_genes.bed", format = "BED")
-rtracklayer::export(hml_genes_v2_with_flanks, 
-                    "Called_genes_with_nascent_flanks.bed", format = "BED")
+rtracklayer::export(hml_genes_v2_RT, 
+                    "Called_genes_with_RT_tails.bed", format = "BED")
 write_grl_as_bed12(hml_tx, "Called_transcripts.bed")
 rtracklayer::export(fusion_genes, "Fusion_genes.bed", format = "BED")
 write_grl_as_bed12(fusion_tx, "Fusion_transcripts.bed")
-rtracklayer::export(lncrna, "LncRNAs.bed", format = "BED")
+rtracklayer::export(lncrna, "Called_lncRNAs.bed", format = "BED")
 ```
 
+Observe that the thick parts of genes in the "Called_genes_with_RT_tails.bed" track correspond to the mature transcripts (from TSS to PAS), whereas the thin 3' extensions denote RT tails. This is different from the traditional visualization scheme (where thick parts are coding exonic intervals between start and stop codons, and thin flanks are 5' and 3'-UTRs).
 
-# Appendix 1. Annotation-guided mode
 
-The pipeline described above was designed for *de novo* calling of gene and transcript models from the experimental data only. However, in some cases an existing annotation may help to refine the called models. For example, MC and LC transcripts and genes lack TSS and/or PAS. One possible reason is that all long reads in given locus were obtained from RNA fragments, not from full-length RNA molecules. Thus, the distance between the borders of long reads and the relevant TSS or PAS exceeds the reasonable limits (which are controlled by `read_flanks_up` and `read_flanks_down` arguments of the `extend_long_reads_to_TSS_and_PAS()` function). In this case, the existing annotation may help to connect the TSS/PAS with the called gene. The truncated called transcript will be extended along its best mate among the annotated transcripts towards the called TSS and/or PAS.
+# Appendix 1. Strandedness of full-length RNA-seq methods
+
+Full-length RNA-seq on the Oxford Nanopore platform comes in two flavors:
+
+* Direct RNA sequencing:
+    * ONT Direct RNA Sequencing kit;
+* cDNA sequencing:
+    * ONT cDNA-PCR Sequencing kit;
+    * ONT Direct cDNA Sequencing kit;
+    * A third party cDNA synthesis kit (e.g. Takara SMARTer PCR cDNA synthesis kit) + ONT Ligation Sequencing kit.
+
+In the case of Direct RNA-seq, ONT sequencing adapters are ligated only to the 3'-end of the original RNA molecule. Sequencing always occurs in the 3' -> 5' direction. Therefore, the long reads retain the strand orientation of the original RNA molecules.
+
+In the case of full-length cDNA sequencing, ONT sequencing adapters are ligated to both ends of the double-stranded cDNA. It is impossible to predict direction of the sequencing (the first or the second strand of cDNA can be sequenced with equal probabilities). In other words, the strand orientation of the original RNA molecule is lost. The *TranscriptomeReconstructoR* assumes that the input long reads are properly stranded, thus it cannot be used with unstranded cDNA sequencing data.
+
+Theoretically, it might be possible to recover the strand orientation of a full-length cDNA dataset, given that the cDNA synthesis method produces asymmetric cDNA flanks (i.e. the oligo-dT primer and the template switching oligo have different 5' sequences). Unfortunately, it is not the case of the commonly used Takara (Clontech) SMARTer cDNA synthesis kit (where both the 3’ SMART CDS Primer II A and the SMARTer II A Oligonucleotide begin with the same 5'-AAGCAGTGGTATCAACGCAGAGTAC-3' sequence). However, if a custom oligo-dT primer were used instead of the 3’ SMART CDS Primer II A, then the strandedness of long reads could be guessed from the adapter sequences by a custom script.
+
+Luckily, the PacBio Iso-Seq pipeline automatically detects the strand orientation of HQ consensus reads (even despite the fact they are obtained from double-stranded cDNA).
+
+In conclusion, long reads from ONT Direct RNA-seq and PacBio Iso-Seq are stranded and thus can be used as input for the *TranscriptomeReconstructoR*. Long reads from ONT cDNA-seq are unstranded and thus are not compatible with *TranscriptomeReconstructoR* (unless the strand orientation was recovered by a custom approach).
+
+
+# Appendix 2. Annotation-guided mode
+
+The pipeline described above was designed for *de novo* calling of gene and transcript models from the experimental data only. However, in some cases an existing annotation may help to refine the called models. For example, MC and LC transcripts lack TSS and/or PAS. One possible reason is that all long reads in given locus were obtained from RNA fragments, not from full-length RNA molecules. Thus, the distance between the borders of long reads and the relevant TSS or PAS exceeds the reasonable limits (which are controlled by `read_flanks_up` and `read_flanks_down` arguments of the `extend_long_reads_to_TSS_and_PAS()` function). In this case, the existing annotation may help to connect the TSS/PAS with the called gene. The truncated called transcript will be extended along its best mate among the annotated transcripts towards the called TSS and/or PAS.
 
 ![](Fig_11.png)
 
-Another possible scenario is that a low expressed gene has both TSS and PAS, however zero coverage in the full-length RNA-seq dataset (due to relatively low throughput of 3^rd^ generation sequencing). If these TSS and PAS are connected by an annotated gene, then such gene and its transcripts can be imported into the called gene and transcript models.
+Another possible scenario is that a low expressed gene has both TSS and PAS, however zero coverage in the full-length RNA-seq dataset (due to relatively low throughput of Third generation sequencing). If these TSS and PAS are connected by an annotated gene, then such gene and its transcripts can be imported into the called gene and transcript models.
 
-Finally, the data-driven correction of exon borders by the `adjust_exons_of_long_reads()` function does not guarantee that the coordinates of splice sites were detected precisely (the majority vote does not always provide the best decision). On the other hand, the existing annotations are usually based on short read RNA-seq data which are characterized by low error rate and thus high precision split alignments. Therefore, the *de novo* detected exon borders can be further corrected by the annotated splice sites.
+Finally, the data-driven correction of exon borders by the `adjust_exons_of_long_reads()` function does not guarantee that the coordinates of splice sites were detected precisely (the majority vote does not always provide the right decision). On the other hand, the existing annotations are usually based on short read RNA-seq data which are characterized by low error rate and thus high precision split alignments. Therefore, the *de novo* detected exon borders can be further corrected by the annotated splice sites.
 
-The `refine_transcripts_by_annotation()` function implements the ideas described above. It should be used after calling *de novo* models by the `call_transcripts_and_genes()` function, but **before** running the `process_nascent_intervals()` function. It needs the following input objects:
+The `refine_transcripts_by_annotation()` function implements these three ideas. It should be used after calling *de novo* models by the `call_transcripts_and_genes()` function, but **before** running the `process_nascent_intervals()` function. It needs the following input objects:
 
 * HC, MC and LC transcripts (*GRangesList* returned by the `call_transcripts_and_genes()` function);
 * Annotated exons grouped by transcript (*GRangesList* object, e.g. returned by the `exonsBy(by = "tx")` function);
@@ -294,7 +339,7 @@ The `refine_transcripts_by_annotation()` function returns a *List* with the foll
 If nascent RNA-seq dataset is used in the study, then the updated HC, MC and LC genes are used as input for the `process_nascent_intervals()` function. If not, then the objects returned by the `refine_transcripts_by_annotation()` function are the final gene and transcript model to be exported into BED files.
 
 
-# Appendix 2. Download and align the raw data
+# Appendix 3. Download and align the raw data
 
 Download Direct RNA-seq data from @parker2020:
 ```{bash download_ont, eval = FALSE, class.source = "fold-hide"}
@@ -315,7 +360,7 @@ cat ont_rep2_part?.fq > ont_rep2.fq && rm ont_rep2_part?.fq
 find ./*FAH83697* -type f -name "*fastq" -exec cat {} > ont_rep3.fq \;
 find ./*FAH83552* -type f -name "*fastq" -exec cat {} > ont_rep4.fq \;
 # Compress the final FASTQ files:
-for file in ont_{1..4}.fq; do gzip $file; done
+for file in ont_rep{1..4}.fq; do gzip $file; done
 ```
 
 Download CAGE-seq data from @thieffry2020:
@@ -358,7 +403,7 @@ STAR --runMode genomeGenerate --genomeDir ${genome_dir} --genomeFastaFiles ${gen
 Align ONT long reads:
 ```{bash align_ont, eval = FALSE, class.source = "fold-hide"}
 # Align to TAIR10 using Minimap2 v2.17:
-for file in ont_{1..4}.fq.gz; do echo $file && minimap2 -t 8 -ax splice -k 14 -L --cs --secondary=no -G 10000 TAIR10.fa $file > ${file/fq.gz/sam}; done
+for file in ont_rep{1..4}.fq.gz; do echo $file && minimap2 -t 8 -ax splice -k 14 -L --cs --secondary=no -G 10000 TAIR10.fa $file > ${file/fq.gz/sam}; done
 # Convert SAM to sorted BAM:
 for file in ont*sam; do echo $file && samtools view -hu $file | samtools sort - -o ${file/sam/bam}; done
 # Filter out unmapped reads and reads with low MAPQ:
@@ -406,40 +451,13 @@ for file in planet*bam; do echo $file && samtools view -hb -f 2 $file | samtools
 # Filter for reads with high MAPQ:
 for file in planet*sorted.bam; do echo $file && samtools view -q 10 $file -o ${file/.bam/_mapq.bam}; done
 # Deduplicate (UMI-Tools):
-for file in planet*mapq.bam; do echo $file && samtools index $file && umi_tools dedup --stdin=${file} --stdout=${file/.bam/_final.bam} --paired; done
+for file in planet*mapq.bam; do echo $file && samtools index $file && umi_tools dedup --stdin=${file} --stdout=${file/_sorted_mapq.bam/_final.bam} --paired; done
 ```
 
 Subset Direct RNA-seq, CAGE-seq and PAT-seq BAM files to an example 300Kb interval on chromosome 1:
 ```{bash filter_bam, eval = FALSE, class.source = "fold-hide"}
-for file in *final.bam; do echo $file && samtools view -hb $file "1:10000000-10300000" > ${file/final.bam/filt.bam}; done
+for file in *final.bam; do echo $file && samtools view -hb $file "1:10000000-10300000" > ${file/_final/_filt}; done
 ```
-
-
-# Appendix 3. Strandedness of full-length RNA-seq methods
-
-Full-length RNA-seq on the Oxford Nanopore platform comes in two flavors:
-
-* Direct RNA sequencing:
-    * ONT Direct RNA Sequencing kit;
-* cDNA sequencing:
-    * ONT cDNA-PCR Sequencing kit;
-    * ONT Direct cDNA Sequencing kit;
-    * Takara SMARTer PCR cDNA synthesis kit + ONT Ligation Sequencing kit.
-
-In the former case, ONT sequencing adapters are ligated only to the 3'-end of the original RNA molecule. Sequencing always occurs in the 3' -> 5' direction. Therefore, the long read retains the strand orientation of the original RNA molecule.
-
-In the latter case, ONT sequencing adapters are ligated to both ends of the double-stranded cDNA. It is impossible to predict direction of the sequencing (the first or the second strand of cDNA can be sequenced with equal probabilities). In other words, the strand orientation of the original RNA molecule is lost. The *TranscriptomeReconstructoR* assumes that the input long reads are properly stranded, and it should not be used with unstranded cDNA sequencing data.
-
-Theoretically, it must be possible to recover the strand orientation of a cDNA dataset by analyzing the unaligned flanks of long reads:
-
-* The remnant of poly(A) tail is expected to produce a poly(A) stretch at the beginning of the original strand and a poly(T) stretch at the end of the reverse complementary strand;
-* Depending on the cDNA synthesis protocol, the original and the reverse complementary strands may also start with different adapter sequences.
-
-Unfortunately, the commonly used Takara (Clontech) SMARTer cDNA synthesis kit produces symmetric flanks around the double-stranded cDNA molecule, thus the latter approach cannot be used. However, it must be possible to produce asymmetric cDNA flanks by using this kit with a custom oligo-dT primer instead of the 3’ SMART CDS Primer II A. In this case, a custom script should be written to recover the strandedness of long reads prior to loading them into the *TranscriptomeReconstructoR*.
-
-Luckily, the PacBio Iso-Seq pipeline automatically detects the strand orientation of HQ consensus reads (even despite the fact they are obtained from double-stranded cDNA).
-
-In conclusion, long reads from ONT Direct RNA-seq and PacBio Iso-Seq are stranded and thus can be used as input for the *TranscriptomeReconstructoR*. Long reads from ONT cDNA-seq are unstranded and thus are not compatible with *TranscriptomeReconstructoR* (unless the strand orientation was recovered by a certain custom approach).
 
 
 # Appendix 4. The algorithm
@@ -494,7 +512,7 @@ Both input and output for this function are *GRangesList* objects containing lon
 
 ## call_transcripts_and_genes()
 
-The input for `call_transcripts_and_genes()` function is *GRangesList* object containing long reads. The long reads are expected to be already processed by the upstream functions in the pipeline (`extend_long_reads_to_TSS_and_PAS()`, `adjust_exons_of_long_reads()` and `detect_alignment_errors()`). These upstream steps serve two purposes: i) attenuate the alignment "noise" associated with 3^rd^ generation sequencing data; ii) detect reads which are not informative of the original transcripts (i.e. reads truncated at one or both ends and/or containing suspected alignment errors). Such reads are skipped from consideration when calling the transcripts and genes. Only "complete" reads without misaligned exons are used. Observe that some reads marked as "complete" may still miss TSS and/or PAS (see the description of `extend_long_reads_to_TSS_and_PAS()` function above).
+The input for `call_transcripts_and_genes()` function is *GRangesList* object containing long reads. The long reads are expected to be already processed by the upstream functions in the pipeline (`extend_long_reads_to_TSS_and_PAS()`, `adjust_exons_of_long_reads()` and `detect_alignment_errors()`). These upstream steps serve two purposes: i) attenuate the alignment "noise" associated with Third generation sequencing data; ii) detect reads which are not informative of the original transcripts (i.e. reads truncated at one or both ends and/or containing suspected alignment errors). Such reads are skipped from consideration when calling the transcripts and genes. Only "complete" reads without misaligned exons are used. Observe that some reads marked as "complete" may still miss TSS and/or PAS (see the description of `extend_long_reads_to_TSS_and_PAS()` function above).
 
 Transcript calling is a multi-step procedure:
 
@@ -557,7 +575,7 @@ This function takes a few inputs *GenomicRanges* objects:
 * (optionally) Unused reads (*GRangesList* returned by the `call_transcripts_and_genes()`);
 * (optionally) Low coverage gaps (*GRanges* returned by the `call_transcribed_intervals()`).
 
-All called genes overlap with intervals of nascent transcription, at that the transcribed intervals are usually wider than the genes. In particular, many genes have trailing "tails" of nascent transcription (known as readthrough, or RT, tails) immediately downstream from their PAS. Certain genes may also have nascent transcription signal immediately upstream from their TSS. The `process_nascent_intervals()` function combines the called genes with such gene-associated upstream and downstream transcribed intervals. The outer borders of HC, MC and LC genes are extended to cover the whole transcription unit (at that, the original gene coordinates which correspond to the area of productive elongation are moved to the *thick* metadata column of the *GRanges* object).
+All called genes overlap with intervals of nascent transcription, at that the transcribed intervals are usually wider than the genes. In particular, many genes have trailing "tails" of nascent transcription (known as readthrough, or RT, tails) immediately downstream from their PAS. The `process_nascent_intervals()` function combines the called genes with their RT tails. The outer borders of HC, MC and LC genes are extended to cover the whole transcription unit (at that, the original gene coordinates which correspond to the area of productive elongation are moved to the *thick* metadata column of the *GRanges* object).
 
 ![](Fig_09.png)
 
@@ -569,8 +587,8 @@ Finally, intervals of nascent transcription which do not overlap with any called
 
 The `process_nascent_intervals()` function returns a *List* with the following elements:
 
-1. HC, MC and LC genes (*GRanges* almost identical to the input object, except that some genes might have found their missing TSS and/or PAS);
-1. HC, MC and LC genes decorated with the upstream and downstream intervals of nascent transcription (*GRanges* object with the *thick* metadata column);
+1. HC, MC and LC genes (*GRanges* almost identical to the input `hml_genes` object, except that some genes might have found their missing TSS and/or PAS);
+1. HC, MC and LC genes decorated with the RT tails (*GRanges* object with the *thick* metadata column);
 1. Antisense and intergenic lncRNAs (*GRanges* object).
 
 
