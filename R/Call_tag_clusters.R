@@ -113,23 +113,3 @@ call_TCs <- function(data, min_support = length(data), min_tpm = 0.05, max_gap =
   return(tc)
 }
 
-# ----------------------------------------------------------------------------------------------------------------
-
-quantile_trim <- function(x, q, value = "idx") {
-  stopifnot(value %in% c("idx", "lgl"))
-  idx <- BiocGenerics::order(x, decreasing = TRUE)
-  x2 <- x[idx]
-  last_good <- BiocGenerics::which(cumsum(x2) / sum(x2) >= (1 - q))[[1]]
-  if (last_good == length(x)) {
-    out <- 1:length(x)
-  } else {
-    out <- BiocGenerics::which(x >= x2[last_good])
-  }
-  if (value == "idx") {
-    return(out)
-  } else {
-    lgl <- rep(FALSE, times = length(x))
-    lgl[out] <- TRUE
-    return(lgl)
-  }
-}

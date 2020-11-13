@@ -81,7 +81,14 @@ process_nascent_intervals <- function(hml_genes, nascent, tss, pas, reads_free =
   genic <- GenomicRanges::reduce(hml_genes)
   message("Calling and trimming tails...")
   # Subtract called genes from transcribed intervals:
-  nascent_2 <- GenomicRanges::setdiff(nascent, hml_genes)
+  if (is.null(gaps)) {
+    nascent_2 <- GenomicRanges::setdiff(nascent, hml_genes)
+  } else {
+    # Extend hml_genes by overlapping gaps (to avoid considering a downstream lncRNA as an RT tail):
+    gaps_over_hml <- gaps[gaps %over% hml_genes]
+    hml_genes_ext <- GenomicRanges::union(hml_genes, gaps_over_hml)
+    nascent_2 <- GenomicRanges::setdiff(nascent, hml_genes_ext)
+  }
   # Find nascent tails:
   tails <- nascent_2[suppressWarnings(GenomicRanges::flank(nascent_2, 1)) %over% hml_genes]
   # Trim tails by outer borders of used TSS:
@@ -106,7 +113,7 @@ process_nascent_intervals <- function(hml_genes, nascent, tss, pas, reads_free =
   pas_strong <- pas[pas %outside% genic & BiocGenerics::score(pas) >= min_score_2]
   heads <- trim_by_down_or_upstream_features(heads, pas_strong, mode = "up", offset = trim_offset)
   # The remaining transcribed intervals can be regarded as lncRNAs:
-  lncrna <- GenomicRanges::setdiff(nascent_3, heads) %>% `[`(BiocGenerics::width(.) >= min_lncrna_width)
+  nascent_4 <- GenomicRanges::setdiff(nascent_3, heads)
   if (isTRUE(extend_along_nascent)) {
     message("Extending MC and LC genes along heads and tails towards unused TSS and PAS...")
     # Extend MC and LC genes without TSS along plaNET-seq intervals towards nearby strong TSS (if any):
@@ -114,20 +121,21 @@ process_nascent_intervals <- function(hml_genes, nascent, tss, pas, reads_free =
     results <- hml_genes[wo_tss] %>% extend_genes_along_nascent_intervals(tss_strong, heads, mode = "tss", flanks = extension_flanks)
     hml_genes <- c(hml_genes[!wo_tss], results[[1]]) %>% BiocGenerics::sort()
     heads <- results[[2]]
-    #tss_strong <- tss_strong[tss_strong %outside% hml_genes] # update the unused strong TSS
     # Extend MC and LC genes without PAS along plaNET-seq intervals towards nearby strong PAS (if any):
     wo_pas <- GenomicRanges::resize(hml_genes, 1, "end") %outside% pas
     results <- hml_genes[wo_pas] %>% extend_genes_along_nascent_intervals(pas_strong, tails, mode = "pas", flanks = extension_flanks)
     hml_genes <- c(hml_genes[!wo_pas], results[[1]]) %>% BiocGenerics::sort()
     tails <- results[[2]]
-    #pas_strong <- pas_strong[pas_strong %outside% hml_genes] # update the unused strong PAS
+    # Observe that now an LC gene may behave like MC or HC (i.e. start in TSS and/or end in PAS);
+    # Similarly, an MC gene may behave like HC;
   }
-  # Decorate genes with nascent heads and tails:
-  message(length(heads), " heads;")
-  message(length(tails), " tails;")
+  # Return trimmed heads to the lncRNA pool:
+  lncrna <- c(nascent_4, heads) %>% `[`(BiocGenerics::width(.) >= min_lncrna_width)
+  # Decorate genes with RT tails:
+  message(length(tails), " RT tails;")
   S4Vectors::mcols(hml_genes)$thick <- GenomicRanges::granges(hml_genes) %>% unname()
-  hml_genes_with_fl <- hml_genes %>% decorate_genes(heads, mode = "up") %>% decorate_genes(tails, mode = "down")
-  if (is.null(reads_free)) {
+  hml_genes_with_fl <- hml_genes %>% decorate_genes(tails, mode = "down")
+  if (!is.null(reads_free)) {
     # Merge lncRNAs if connected by a free_read:
     range_free <- reads_free %>% range() %>% BiocGenerics::unlist(use.names = FALSE)
     range_over_lncrna <- range_free[GenomicRanges::countOverlaps(range_free, lncrna) >= 2] %>% GenomicRanges::reduce()

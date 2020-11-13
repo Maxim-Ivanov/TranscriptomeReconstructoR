@@ -407,4 +407,24 @@ pintersect_punion_on_grl <- function(grl_a, grl_b, mode) {
   return(out)
 }
 
+# ----------------------------------------------------------------------------------------------------------------
+
+quantile_trim <- function(x, q, value = "idx") {
+  stopifnot(value %in% c("idx", "lgl"))
+  idx <- BiocGenerics::order(x, decreasing = TRUE)
+  x2 <- x[idx]
+  last_good <- BiocGenerics::which(cumsum(x2) / sum(x2) >= (1 - q))[[1]]
+  if (last_good == length(x)) {
+    out <- 1:length(x)
+  } else {
+    out <- BiocGenerics::which(x >= x2[last_good])
+  }
+  if (value == "idx") {
+    return(out)
+  } else {
+    lgl <- rep(FALSE, times = length(x))
+    lgl[out] <- TRUE
+    return(lgl)
+  }
+}
 

@@ -31,7 +31,7 @@
 #'     \item \code{GRangesList} object (unused long reads outside of the called genes and transcripts).
 #' }
 #' @export
-call_transcripts_and_genes <- function(long_reads, skip_minor_tx = 0.005, max_overlap_called = 0.1, min_read_width = 1000, min_overlap_fusion = 0.5, clust_threshold = 0.8) {
+call_transcripts_and_genes <- function(long_reads, skip_minor_tx = 0.01, max_overlap_called = 0.1, min_read_width = 1000, min_overlap_fusion = 0.5, clust_threshold = 0.8) {
   stopifnot(BiocGenerics::grepl("GRangesList", class(long_reads)))
   stopifnot(is.numeric(skip_minor_tx) && length(skip_minor_tx) == 1 && skip_minor_tx > 0 && skip_minor_tx < 1)
   stopifnot(is.numeric(max_overlap_called) && length(max_overlap_called) == 1 && max_overlap_called >= 0 && max_overlap_called < 1)
@@ -58,18 +58,21 @@ call_transcripts_and_genes <- function(long_reads, skip_minor_tx = 0.005, max_ov
   res_hc <- good_exons[lgl] %>% call_tx_and_find_fusion(prefix = "HC", min_overlap_fusion = min_overlap_fusion, clust_threshold = clust_threshold, skip = TRUE)
   hc_tx <- res_hc[[1]]
   fusion_tx <- res_hc[[2]]
-  good_exons <- good_exons[!lgl] %>% update_free_reads(c(hc_tx, fusion_tx), max_overlap_called = max_overlap_called, min_read_width = min_read_width, clust_threshold = clust_threshold)
+  #good_exons <- good_exons[!lgl] %>% update_free_reads(c(hc_tx, fusion_tx), max_overlap_called = max_overlap_called, min_read_width = min_read_width, clust_threshold = clust_threshold)
+  good_exons <- good_exons[!lgl] %>% update_free_reads(hc_tx, max_overlap_called = max_overlap_called, min_read_width = min_read_width, clust_threshold = clust_threshold)
   # Call MC transcripts (from TSS-only or PAS-only reads):
   lgl <- S4Vectors::mcols(good_exons)$over_tc != "no"
   res_mc <- good_exons[lgl] %>% call_tx_and_find_fusion(prefix = "MC", known_tx = hc_tx, known_fusion = fusion_tx, min_overlap_fusion = min_overlap_fusion, clust_threshold = clust_threshold, skip = TRUE)
   hc_mc_tx <- res_mc[[1]]
   fusion_tx <- res_mc[[2]]
-  good_exons <- good_exons[!lgl] %>% update_free_reads(c(hc_mc_tx, fusion_tx), max_overlap_called = max_overlap_called, min_read_width = min_read_width, clust_threshold = clust_threshold)
+  #good_exons <- good_exons[!lgl] %>% update_free_reads(c(hc_mc_tx, fusion_tx), max_overlap_called = max_overlap_called, min_read_width = min_read_width, clust_threshold = clust_threshold)
+  good_exons <- good_exons[!lgl] %>% update_free_reads(hc_mc_tx, max_overlap_called = max_overlap_called, min_read_width = min_read_width, clust_threshold = clust_threshold)
   # Call LC transcripts (from noTSS-noPAS reads):
   res_lc <- good_exons %>% call_tx_and_find_fusion(prefix = "LC", known_tx = hc_mc_tx, known_fusion = fusion_tx, min_overlap_fusion = min_overlap_fusion, clust_threshold = clust_threshold, skip = TRUE)
   hml_tx <- res_lc[[1]]
   fusion_tx <- res_lc[[2]]
-  exons_free <- exons_unused %>% update_free_reads(c(hml_tx, fusion_tx), max_overlap_called = max_overlap_called, min_read_width = min_read_width, clust_threshold = clust_threshold)
+  #exons_free <- exons_unused %>% update_free_reads(c(hml_tx, fusion_tx), max_overlap_called = max_overlap_called, min_read_width = min_read_width, clust_threshold = clust_threshold)
+  exons_free <- exons_unused %>% update_free_reads(hml_tx, max_overlap_called = max_overlap_called, min_read_width = min_read_width, clust_threshold = clust_threshold)
   reads_free <- S4Vectors::split(exons_free, S4Vectors::mcols(exons_free)$read_id)
   # Split hml_tx into HC, MC and LC transcripts:
   tx_spl <- split_tx_by_type(hml_tx)
@@ -78,7 +81,7 @@ call_transcripts_and_genes <- function(long_reads, skip_minor_tx = 0.005, max_ov
   lc_tx <- tx_spl[[3]]
   # Call HC, MC and LC genes:
   hc_genes <- call_genes(hc_tx, clust_threshold = clust_threshold)
-  mc_genes <- call_genes(mc_tx, clust_threshold = clust_threshold)
+  mc_genes <- call_genes(mc_tx, clust_threshold = clust_threshold) # observe that some MC genes may behave as HC or LC (i.e. appear as TSS+PAS or noTSS-noPAS)
   lc_genes <- call_genes(lc_tx, clust_threshold = clust_threshold)
   # Skip minor transcripts within each gene:
   if (!is.null(skip_minor_tx)) {
@@ -111,7 +114,6 @@ call_transcripts_and_genes <- function(long_reads, skip_minor_tx = 0.005, max_ov
   # Convert them to new fusion transcripts:
   reads_fusion_dedup <- deduplicate_grl(reads_fusion)
   reads_fusion_unl <- BiocGenerics::unlist(reads_fusion_dedup, use.names = FALSE)
-  #S4Vectors::mcols(reads_fusion_unl)$score <- countOverlaps(reads_fusion_dedup, reads_fusion, type = "equal") %>% `[`(grp)
   S4Vectors::mcols(reads_fusion_unl)$type <- "Fusion"
   reads_fusion_dedup <- BiocGenerics::relist(reads_fusion_unl, reads_fusion_dedup)
   fusion_tx <- c(fusion_tx, reads_fusion_dedup) %>% unname() %>% sort_grl()
@@ -125,7 +127,6 @@ call_transcripts_and_genes <- function(long_reads, skip_minor_tx = 0.005, max_ov
   fusion_tu_id <- sprintf(paste0("%0", nchar(length(fusion_tu)), "i"), 1:length(fusion_tu))
   S4Vectors::mcols(fusion_tu)$name <- BiocGenerics::paste(S4Vectors::mcols(fusion_tu)$type, "TU", fusion_tu_id, sep = "_")
   # Generate unique IDs for fusion transcripts:
-  #names(fusion_tx) <- paste0("Fusion_tx_", sprintf(paste0("%0", nchar(length(fusion_tx)), "i"), 1:length(fusion_tx)))
   fusion_tx <- generate_tx_id(fusion_tx, fusion_tu)
   S4Vectors::mcols(hml_genes)$revmap <- NULL
   S4Vectors::mcols(fusion_tu)$revmap <- NULL
