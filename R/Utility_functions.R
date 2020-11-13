@@ -36,6 +36,9 @@ save_GRanges_as_bedGraph <- function(gr, filepath, colname = "score") {
 #' If \code{name_in_mcols == TRUE}, then the \code{S4Vectors::mcols(grl)$name} is exported as range names (otherwise the \code{names(grl)} is used).
 #' @export
 write_grl_as_bed12 <- function(grl, filename, name_in_mcols = FALSE) {
+  stopifnot(BiocGenerics::grepl("GRangesList", class(gr_list)))
+  stopifnot(is.character(filename) && length(filename) == 1)
+  stopifnot(is.logical(name_in_mcols) && length(name_in_mcols) == 1)
   gr <- range(grl) %>% BiocGenerics::unlist(use.names = FALSE)
   grl_unl <- BiocGenerics::unlist(grl, use.names = FALSE)
   idx_fw <- BiocGenerics::lapply(S4Vectors::elementNROWS(grl), function(x) { seq(1, x) }) %>% BiocGenerics::unlist() %>% unname()
@@ -105,8 +108,15 @@ flip_strand_info <- function(gr) {
 
 # -----------------------------------------------------------------------------------------------------------------
 
+#' Merge coverage of GRanges objects
+#'
+#' @param gr_list List of \code{GRanges} objects with \code{score} metadata column
+#' @return \code{GRanges} object
+#' @export
 merge_GRanges <- function(gr_list) {
-  # gr_list is expected to be a list of GRanges with "score" column
+  stopifnot(class(gr_list) == "list" || BiocGenerics::grepl("GRangesList", class(gr_list)))
+  stopifnot(length(gr_list) > 0)
+  stopifnot(all(unlist(lapply(gr_list, function(x) { !is.null(BiocGenerics::score(x)) }))))
   cov_fw <- gr_list %>% BiocGenerics::lapply(function(x) { GenomicRanges::coverage(x[BiocGenerics::strand(x) == "+"], weight = "score") }) %>% BiocGenerics::Reduce(`+`, .) %>% GenomicRanges::bindAsGRanges(score = .)
   cov_rev <- gr_list %>% BiocGenerics::lapply(function(x) { GenomicRanges::coverage(x[BiocGenerics::strand(x) == "-"], weight = "score") }) %>% BiocGenerics::Reduce(`+`, .) %>% GenomicRanges::bindAsGRanges(score = .)
   BiocGenerics::strand(cov_fw) <- "+"
