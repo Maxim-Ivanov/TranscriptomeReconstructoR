@@ -130,7 +130,7 @@ process_nascent_intervals <- function(hml_genes, nascent, tss, pas, reads_free =
     # Similarly, an MC gene may behave like HC;
   }
   # Return trimmed heads to the lncRNA pool:
-  lncrna <- c(nascent_4, heads) %>% `[`(BiocGenerics::width(.) >= min_lncrna_width)
+  lncrna <- c(nascent_4, heads) %>% GenomicRanges::sort()
   # Decorate genes with RT tails:
   message(length(tails), " RT tails;")
   S4Vectors::mcols(hml_genes)$thick <- GenomicRanges::granges(hml_genes) %>% unname()
@@ -149,6 +149,8 @@ process_nascent_intervals <- function(hml_genes, nascent, tss, pas, reads_free =
   # Ensure that all lncRNAs have at least <trim_offset> gap with the nearest genes (both up- and downstream):
   lncrna <- lncrna %>% trim_by_down_or_upstream_features(hml_genes, mode = "down", offset = trim_offset) %>%
     trim_by_down_or_upstream_features(hml_genes, mode = "up", offset = trim_offset)
+  # Filter lncRNAs by width:
+  lncrna <- lncrna %>% `[`(BiocGenerics::width(.) >= min_lncrna_width)
   # Prepare the output:
   S4Vectors::mcols(lncrna)$score <- 0
   S4Vectors::mcols(lncrna)$type <- "Nascent"
