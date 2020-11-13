@@ -6,7 +6,7 @@
 \usage{
 call_transcripts_and_genes(
   long_reads,
-  skip_minor_tx = 0.005,
+  skip_minor_tx = 0.01,
   max_overlap_called = 0.1,
   min_read_width = 1000,
   min_overlap_fusion = 0.5,
