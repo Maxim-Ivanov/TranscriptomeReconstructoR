@@ -81,7 +81,7 @@ library(TranscriptomeReconstructoR)
 * PAT-seq from @yu2019;
 * plaNET-seq from @kindgren2020.
 
-For more details on downloading, pre-processing and alignment of the raw sequencing data, **see Appendix 3**. The BAM files were subsetted to a 300Kb interval on chromosome 1 (1:10,000,000-10,300,000). To retrieve the filenames, run the following code:
+Details on downloading, pre-processing and alignment of the raw sequencing data can be found [here](https://github.com/Maxim-Ivanov/Ivanov_et_al_2021/blob/main/01-Download_and_remap_published_data.sh). The BAM files were subsetted to a 300Kb interval on chromosome 1 (1:10,000,000-10,300,000). To retrieve the filenames, run the following code:
 
 ```{r filenames}
 pkg <- "TranscriptomeReconstructoR"
@@ -102,7 +102,7 @@ nascent_bamfiles <- system.file("extdata",
 When running the pipeline on other datasets, use the `list.files(full.names = TRUE)` function instead.
 
 # Usage
-The pipeline consists of a few steps which have to be executed sequentially. For a more detailed explanation of the underlying algorithm, see **Appendix 4**.
+The pipeline consists of a few steps which have to be executed sequentially. For a more detailed explanation of the underlying algorithm, see **Appendix 3**.
 
 First of all, attach the libraries which are used at the top level of the example pipeline:
 ```{r setup_2, eval = FALSE}
@@ -339,128 +339,7 @@ The `refine_transcripts_by_annotation()` function returns a *List* with the foll
 If nascent RNA-seq dataset is used in the study, then the updated HC, MC and LC genes are used as input for the `process_nascent_intervals()` function. If not, then the objects returned by the `refine_transcripts_by_annotation()` function are the final gene and transcript model to be exported into BED files.
 
 
-# Appendix 3. Download and align the raw data
-
-Download Direct RNA-seq data from @parker2020:
-```{bash download_ont, eval = FALSE, class.source = "fold-hide"}
-# Download raw ONT archives:
-prefix="ftp://ftp.sra.ebi.ac.uk/vol1/run/ERR376"
-wget ${prefix}/ERR3764345/col0_nanopore_drs_1.tar.gz
-wget ${prefix}/ERR3764347/col0_nanopore_drs_2a.tar.gz
-wget ${prefix}/ERR3764348/col0_nanopore_drs_2b.tar.gz
-wget ${prefix}/ERR3764349/col0_nanopore_drs_3.tar.gz
-wget ${prefix}/ERR3764351/col0_nanopore_drs_4.tar.gz
-# Extract subfolders with FASTQ files:
-for file in *tar.gz; do tar xvf $file --wildcards '*fastq/pass*'; done
-# Concatenate FASTQ files belonging to the same sample:
-find ./*FAH45730* -type f -name "*fastq" -exec cat {} > ont_rep1.fq \;
-find ./*FAH77434* -type f -name "*fastq" -exec cat {} > ont_rep2_part1.fq \;
-find ./*FAH59362* -type f -name "*fastq" -exec cat {} > ont_rep2_part2.fq \;
-cat ont_rep2_part?.fq > ont_rep2.fq && rm ont_rep2_part?.fq
-find ./*FAH83697* -type f -name "*fastq" -exec cat {} > ont_rep3.fq \;
-find ./*FAH83552* -type f -name "*fastq" -exec cat {} > ont_rep4.fq \;
-# Compress the final FASTQ files:
-for file in ont_rep{1..4}.fq; do gzip $file; done
-```
-
-Download CAGE-seq data from @thieffry2020:
-```{bash download_cage, eval = FALSE, class.source = "fold-hide"}
-acc="SRR10045003"; fastq-dump --gzip ${acc} && mv ${acc}.fastq.gz cage_rep1.fq.gz
-acc="SRR10045004"; fastq-dump --gzip ${acc} && mv ${acc}.fastq.gz cage_rep2.fq.gz
-acc="SRR10045005"; fastq-dump --gzip ${acc} && mv ${acc}.fastq.gz cage_rep3.fq.gz
-```
-
-Download PAT-seq data from @yu2019:
-```{bash download_pat, eval = FALSE, class.source = "fold-hide"}
-wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR716/006/SRR7160296/SRR7160296.fastq.gz -O pat_rep1.fq.gz
-wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR716/007/SRR7160297/SRR7160297.fastq.gz -O pat_rep2.fq.gz
-wget ftp://ftp.sra.ebi.ac.uk/vol1/fastq/SRR716/009/SRR7160299/SRR7160299.fastq.gz -O pat_rep3.fq.gz
-```
-
-Download plaNET-seq data from @kindgren2020:
-```{bash download_planet, eval = FALSE, class.source = "fold-hide"}
-acc="SRR9117170"; fastq-dump --split-files ${acc} && for file in ${acc}*fastq; do mv $file ${file/${acc}/planet_rep1_part1}; done
-cat planet_rep1_part?_1.fastq | gzip > planet_rep1_R1.fq.gz && rm planet_rep1_part?_1.fastq
-acc="SRR9117171"; fastq-dump --split-files ${acc} && for file in ${acc}*fastq; do mv $file ${file/${acc}/planet_rep1_part2}; done
-cat planet_rep1_part?_2.fastq | gzip > planet_rep1_R2.fq.gz && rm planet_rep1_part?_2.fastq
-acc="SRR9117172"; fastq-dump --split-files ${acc} && for file in ${acc}*fastq; do mv $file ${file/${acc}/planet_rep2_part1}; done
-cat planet_rep2_part?_1.fastq | gzip > planet_rep2_R1.fq.gz && rm planet_rep2_part?_1.fastq
-acc="SRR9117173"; fastq-dump --split-files ${acc} && for file in ${acc}*fastq; do mv $file ${file/${acc}/planet_rep2_part2}; done
-cat planet_rep2_part?_2.fastq | gzip > planet_rep2_R2.fq.gz && rm planet_rep2_part?_2.fastq
-```
-
-Download the TAIR10 genome assembly for *Arabidopsis thaliana*:
-```{bash download_tair, eval = FALSE, class.source = "fold-hide"}
-genome_dir="." # change to an appropriate directory
-wget ftp://ftp.ensemblgenomes.org/pub/plants/release-26/fasta/arabidopsis_thaliana/dna/ -O ${genome_dir}/TAIR10.fa
-```
-
-Generate genomic index for STAR aligner:
-```{bash index_tair, eval = FALSE, class.source = "fold-hide"}
-STAR --runMode genomeGenerate --genomeDir ${genome_dir} --genomeFastaFiles ${genome_dir}/TAIR10.fa --runThreadN 4
-```
-
-Align ONT long reads:
-```{bash align_ont, eval = FALSE, class.source = "fold-hide"}
-# Align to TAIR10 using Minimap2 v2.17:
-for file in ont_rep{1..4}.fq.gz; do echo $file && minimap2 -t 8 -ax splice -k 14 -L --cs --secondary=no -G 10000 TAIR10.fa $file > ${file/fq.gz/sam}; done
-# Convert SAM to sorted BAM:
-for file in ont*sam; do echo $file && samtools view -hu $file | samtools sort - -o ${file/sam/bam}; done
-# Filter out unmapped reads and reads with low MAPQ:
-for file in ont*bam; do echo $file && samtools view -hb -q 10 -F 4 $file > ${file/.bam/_final.bam}; done
-```
-
-Pre-process CAGE-seq short reads:
-```{bash trim_cage, eval = FALSE, class.source = "fold-hide"}
-# Raw CAGE-seq reads are expected to start with non-template sequence XXX-CAGCAG-G (barcode + EcoP15I site + reverse transcription of the cap);
-# Thus, retain only bases 11-35 and also skip low quality reads:
-for file in cage*fq.gz; do echo $file && zcat $file | fastx_trimmer -f 10 -l 35 | fastq_quality_filter -q 30 -p 50 -z -o ${file/.fq.gz/_trim.fq.gz}; done
-```
-
-Pre-process PAT-seq short reads:
-```{bash trim_pat, eval = FALSE, class.source = "fold-hide"}
-# Raw PAT-seq reads are expected to start with 8bp barcodes followed by oligo-T stretches of variable length:
-for file in pat*fq.gz; do echo $file && cutadapt -j 4 -u 8 -q 10 -g "T{150};e=0.05" --max-n 3 $file | cutadapt -a AGATCGGAAGAGC -m 20 -o ${file/.fq.gz/_trim.fq.gz} -; done
-```
-
-Align CAGE-seq and PAT-seq reads:
-```{bash align_cage_pat, eval = FALSE, class.source = "fold-hide"}
-# Align to TAIR10 using STAR v2.5.2b:
-for file in cage*trim.fq.gz pat*trim.fq.gz; do echo $file && STAR --genomeDir ${genome_dir} --readFilesIn $file --runThreadN 4 --outFileNamePrefix ${file/trim.fq.gz/} --outSAMmultNmax 1 --alignEndsType Extend5pOfRead1 --readFilesCommand zcat --outSAMtype BAM Unsorted; done
-# Clean up after the aligner:
-for file in *Aligned*; do mv $file ${file/_Aligned.out/}; done
-rm -r *STARtmp *out *tab
-# Sort BAM files and remove low MAPQ reads:
-for file in cage*bam pat*bam; do echo $file && samtools view -hq 10 $file | samtools sort - -o ${file/.bam/_final.bam}; done
-```
-
-Align plaNET-seq reads:
-```{bash align_planet, eval = FALSE, class.source = "fold-hide"}
-# Process UMIs in PE mode using UMI-Tools v1.0.1:
-for f1 in planet*R1.fq.gz; do f2=${f1/_R1/_R2} && echo $f1 $f2 && umi_tools extract --stdin=${f1} --read2-in=${f2} --bc-pattern=NNNN --bc-pattern2=NNNN --stdout=${f1/.fq.gz/_UMI.fq.gz} --read2-out=${f2/.fq.gz/_UMI.fq.gz}; done
-# Trim reads using Trim Galore v0.4.3:
-for f1 in planet*R1_UMI.fq.gz; do f2=${f1/_R1/_R2} && echo $f1 $f2 && trim_galore -q 10 -a TGGAATTCTCGG -a2 GATCGTCGGACT --three_prime_clip_R1 4 --three_prime_clip_R2 4 --paired --gzip --length 15 --no_report_file $f1 $f2; done
-for file in *val_1*gz; do mv $file ${file/val_1/trim}; done
-for file in *val_2*gz; do mv $file ${file/val_2/trim}; done
-# Align to TAIR10 in PE mode using STAR v2.5.2b:
-for f1 in planet*R1_UMI_trim.fq.gz; do f2=${f1/_R1/_R2} && echo $f1 $f2 && STAR --genomeDir ${genome_dir} --readFilesIn $f1 $f2 --runThreadN 4 --outFileNamePrefix ${f1/R1_UMI_trim.fq.gz/} --outSAMmultNmax 1 --alignEndsType Extend5pOfReads12 --readFilesCommand zcat --outSAMtype BAM Unsorted; done
-for file in *Aligned*; do mv $file ${file/_Aligned.out/}; done
-rm -r *STARtmp *out *tab
-# Sort BAM files and skip reads not in proper pairs:
-for file in planet*bam; do echo $file && samtools view -hb -f 2 $file | samtools sort - -o ${file/.bam/_sorted.bam}; done
-# Filter for reads with high MAPQ:
-for file in planet*sorted.bam; do echo $file && samtools view -q 10 $file -o ${file/.bam/_mapq.bam}; done
-# Deduplicate (UMI-Tools):
-for file in planet*mapq.bam; do echo $file && samtools index $file && umi_tools dedup --stdin=${file} --stdout=${file/_sorted_mapq.bam/_final.bam} --paired; done
-```
-
-Subset Direct RNA-seq, CAGE-seq and PAT-seq BAM files to an example 300Kb interval on chromosome 1:
-```{bash filter_bam, eval = FALSE, class.source = "fold-hide"}
-for file in *final.bam; do echo $file && samtools view -hb $file "1:10000000-10300000" > ${file/_final/_filt}; done
-```
-
-
-# Appendix 4. The algorithm
+# Appendix 3. The algorithm
 
 ## call_TCs()
 
