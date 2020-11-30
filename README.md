@@ -35,5 +35,10 @@ The vignette contains everything you want to know about TranscriptomeReconstruct
 * Considerations regarding the choice and pre-processing of the input datasets.
 
 ```{r, eval = FALSE}
+browseVignettes("TranscriptomeReconstructoR")
+```
+or
+
+```{r, eval = FALSE}
 vignette("TranscriptomeReconstructoR", package = "TranscriptomeReconstructoR")
 ```
