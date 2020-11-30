@@ -10,7 +10,7 @@ Install the development version from GitHub using `devtools`:
 if (!"devtools" %in% rownames(installed.packages())) {
   install.packages("devtools")
 }
-devtools::install_github("Maxim-Ivanov/TranscriptomeReconstructoR", build_vignettes = TRUE)
+devtools::install_github("Maxim-Ivanov/TranscriptomeReconstructoR", build_vignettes = TRUE, ref = "main")
 ```
 
 Then load the installed package:
