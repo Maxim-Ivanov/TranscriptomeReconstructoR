@@ -171,7 +171,7 @@ rtracklayer::export(tss, "TSS.bed", format = "BED")
 rtracklayer::export(pas, "PAS.bed", format = "BED")
 ```
 
-If by any reason you are not satisfied with the results of peak calling, then changing the default values of `call_TCs` arguments is recommended. In particular, if the input data are noisy (i.e. have high non-specific background), then the results may be improved by using higher `min_tpm`, `q_trim` and `min_score` values. Alternatively, any other peak calling software can be used instead of `call_TCs` (e.g. `r Biocpkg("CAGEr")` or `r Biocpkg("CAGEfightR")`), given that the output is converted to *GRanges* with a valid `score` column.
+If by any reason you are not satisfied with the results of peak calling, then changing the default values of `call_TCs` arguments is recommended. In particular, if the input data are noisy (i.e. have high non-specific background), then the results may be improved by using higher `min_tpm`, `q_trim` and `min_score` values. Alternatively, any other peak calling software can be used instead of `call_TCs` (e.g. `r BiocStyle::Biocpkg("CAGEr")` or `r BiocStyle::Biocpkg("CAGEfightR")`), given that the output is converted to *GRanges* with a valid `score` column.
 
 ## Extend long reads towards nearby TSS and PAS
 
@@ -241,7 +241,7 @@ transcribed <- trans[[1]]
 gaps <- trans[[2]]
 ```
 
-Alternatively, you can use any other dedicated software instead (e.g. `r Biocpkg("groHMM")`) and coerce its output to a *GRanges* object.
+Alternatively, you can use any other dedicated software instead (e.g. `r BiocStyle::Biocpkg("groHMM")`) and coerce its output to a *GRanges* object.
 
 The second step is to interleave the intervals of nascent transcription with the called genes using the `process_nascent_intervals()` function:
 
