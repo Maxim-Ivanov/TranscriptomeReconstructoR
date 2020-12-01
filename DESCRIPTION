@@ -32,3 +32,4 @@ Suggests:
     rmarkdown,
     BiocStyle
 VignetteBuilder: knitr
+BiocViews: Software, Transcription, Transcriptomics, Sequencing, Annotation, GenomeBrowsers
