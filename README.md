@@ -7,15 +7,8 @@
 Install the development version from GitHub using `devtools`:
 
 ```{r, eval = FALSE}
-for (pkg in c("devtools", "BiocManager")) {
-  if (!pkg %in% rownames(installed.packages())) {
-    install.packages(pkg)
-  }
-}
-for (pkg in c("GenomicRanges", "GenomicAlignments", "rtracklayer", "BiocStyle")) {
-  if (!pkg %in% rownames(installed.packages())) {
-    BiocManager::install(pkg)
-  }
+if (!"devtools" %in% rownames(installed.packages())) {
+    install.packages("devtools")
 }
 devtools::install_github("Maxim-Ivanov/TranscriptomeReconstructoR", build_vignettes = TRUE, ref = "main")
 ```
