@@ -2,17 +2,12 @@
 title: "TranscriptomeReconstructoR"
 author: "Maxim Ivanov"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
-#output: rmarkdown::html_vignette
+output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{TranscriptomeReconstructoR}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 bibliography: bibliography.bib
-output:
-  BiocStyle::html_document:
-    number_sections: yes
-    toc: true
-    code_folding: show
 ---
 
 ```{r knits_options, include = FALSE}
@@ -171,7 +166,7 @@ rtracklayer::export(tss, "TSS.bed", format = "BED")
 rtracklayer::export(pas, "PAS.bed", format = "BED")
 ```
 
-If by any reason you are not satisfied with the results of peak calling, then changing the default values of `call_TCs` arguments is recommended. In particular, if the input data are noisy (i.e. have high non-specific background), then the results may be improved by using higher `min_tpm`, `q_trim` and `min_score` values. Alternatively, any other peak calling software can be used instead of `call_TCs` (e.g. `r BiocStyle::Biocpkg("CAGEr")` or `r BiocStyle::Biocpkg("CAGEfightR")`), given that the output is converted to *GRanges* with a valid `score` column.
+If by any reason you are not satisfied with the results of peak calling, then changing the default values of `call_TCs` arguments is recommended. In particular, if the input data are noisy (i.e. have high non-specific background), then the results may be improved by using higher `min_tpm`, `q_trim` and `min_score` values. Alternatively, any other peak calling software can be used instead of `call_TCs` (e.g. *CAGEr* or *CAGEfightR*), given that the output is converted to *GRanges* with a valid `score` column.
 
 ## Extend long reads towards nearby TSS and PAS
 
@@ -241,7 +236,7 @@ transcribed <- trans[[1]]
 gaps <- trans[[2]]
 ```
 
-Alternatively, you can use any other dedicated software instead (e.g. `r BiocStyle::Biocpkg("groHMM")`) and coerce its output to a *GRanges* object.
+Alternatively, you can use any other dedicated software instead (e.g. *groHMM*) and coerce its output to a *GRanges* object.
 
 The second step is to interleave the intervals of nascent transcription with the called genes using the `process_nascent_intervals()` function:
 
@@ -302,7 +297,7 @@ In conclusion, long reads from ONT Direct RNA-seq and PacBio Iso-Seq are strande
 
 The pipeline described above was designed for *de novo* calling of gene and transcript models from the experimental data only. However, in some cases an existing annotation may help to refine the called models. For example, MC and LC transcripts lack TSS and/or PAS. One possible reason is that all long reads in given locus were obtained from RNA fragments, not from full-length RNA molecules. Thus, the distance between the borders of long reads and the relevant TSS or PAS exceeds the reasonable limits (which are controlled by `read_flanks_up` and `read_flanks_down` arguments of the `extend_long_reads_to_TSS_and_PAS()` function). In this case, the existing annotation may help to connect the TSS/PAS with the called gene. The truncated called transcript will be extended along its best mate among the annotated transcripts towards the called TSS and/or PAS.
 
-![](Fig_11.png)
+![](Fig_11.png){ width=100% }
 
 Another possible scenario is that a low expressed gene has both TSS and PAS, however zero coverage in the full-length RNA-seq dataset (due to relatively low throughput of Third generation sequencing). If these TSS and PAS are connected by an annotated gene, then such gene and its transcripts can be imported into the called gene and transcript models.
 
@@ -345,11 +340,11 @@ If nascent RNA-seq dataset is used in the study, then the updated HC, MC and LC 
 
 The input for this function is *GRangesList* object, where each element is *GRanges* with stranded 5'- or 3'-tag counts in a biological replicate sample. By default, only genomic positions with non-zero tag count in all replicate samples are considered. This condition can be relaxed by setting `min_support` argument to a value smaller than the number of input BAM files. After filtering by minimal support, the replicates are pooled, the signal is normalized to tags per million (TPM), and the tag clusters (TCs) are called as continuous intervals with the signal above the `min_tpm` threshold. Adjacent TCs are merged together, if the distance between them does not exceed `max_gap` bp.
 
-![](Fig_01.png)
+![](Fig_01.png){ width=100% }
 
 Then TCs are quantile trimmed to skip the trailing tails of weak signal which often surround the TC summit. The amount of trimming is controlled by the `q_trim` argument.
 
-![](Fig_02.png)
+![](Fig_02.png){ width=100% }
 After trimming, the TCs are merged again (with the same `max_gap` parameter). Finally, each TC gets a score which is the TPM-normalized signal averaged between the replicates. TCs with scores less than `min_score` are skipped. The remaining TCs are returned as *GRanges* object with `score` metadata column.
 
 
@@ -362,11 +357,11 @@ This function takes *GRangesList* with long reads as input. For each long read, 
 
 The functions searches for called TSS overlapping with the upstream window, and for called PAS overlapping with the downstream window. If multiple TSS or PAS were found, then the "strongest" of them (the one with the highest score) is chosen. Then the long reads are extended towards the summits of the found TSS and PAS.
 
-![](Fig_03.png)
+![](Fig_03.png){ width=100% }
 
 Extended long reads which start in a TSS and end in a PAS are classified as "complete", otherwise as "truncated". If a locus (defined as an overlapping group of reads) does not contain any complete read, then the longest truncated read is re-classified as "complete", and its free end is considered as the best estimate of the transcript border. In addition, other truncated reads in this locus which can be safely extended along the "guide exon", are also re-classified as "complete".
 
-![](Fig_04.png)
+![](Fig_04.png){ width=100% }
 
 The function returns *GRangesList* object containing extended long reads with additional metadata columns. Only reads marked as "complete" are used for the transcript calling procedure (see below).
 
@@ -374,7 +369,7 @@ The function returns *GRangesList* object containing extended long reads with ad
 
 This function extracts all splice sites from the input long reads, clusters them within `max_exon_diff` bp distance and then unifies the borders of exonic subalignments to the most frequently observed coordinate within each cluster.
 
-![](Fig_05.png)
+![](Fig_05.png){ width=100% }
 
 Both input and output for this function are *GRangesList* objects containing long reads with identical metadata columns but different coordinates of subalignments. Observe that this "majority vote" procedure does not guarantee to find the true splice sites. However, the number of artifactual transcript isoforms with alternative 5'- or 3'-splice sites differing by only a few basepairs is expected to decrease significantly.
 
@@ -386,7 +381,7 @@ The constitutive exons are defined here as exonic intervals supported by more th
 Subalignment with an alternative 5'- and/or 3-border (relative to a constitutive exon) are considered valid alternative exons, only if the next constitutive exon is also present in the read.
 Otherwise, the alignment is marked as a possible alignment error.
 
-![](Fig_06.png)
+![](Fig_06.png){ width=100% }
 Both input and output for this function are *GRangesList* objects containing long reads with identical coordinates of subalignments. The output object has a new metadata column which determines if the subalignment is a suspected alignment error.
 
 ## call_transcripts_and_genes()
@@ -408,7 +403,7 @@ Transcript calling is a multi-step procedure:
 1. Within each HC, MC or LC gene, we skip the minor isoforms (which collectively represent not more than `skip_minor_tx` fraction of all supporting reads in this locus);
 1. Finally, the HC, MC, LC and fusion genes are recalculated and enumerated.
 
-![](Fig_07.png)
+![](Fig_07.png){ width=100% }
 
 The MC and LC transcripts are called because some loci may have full-length RNA-seq reads, however lack sufficiently strong TSS and/or PAS tag clusters in close proximity to outer borders of the long reads. The mismatch between different methods can happen due to various reasons, e.g.:
 
@@ -437,7 +432,7 @@ The `call_transcripts_and_genes()` function returns a *List* of *GRanges* and *G
 
 This function takes input *GRanges* object with `score` metadata column which represents the stranded coverage in a nascent RNA sequencing experiment. The function simply finds intervals with sequencing coverage not less than `min_signal`. Adjacent intervals (separated by low coverage gaps not exceeding `max_gapwidth` bp) are merged. Intervals shorter than `min_width` are skipped.
 
-![](Fig_08.png)
+![](Fig_08.png){ width=100% }
 
 The return value is a *List* of two *GRanges* objects which contain the continuous transcribed intervals and the low coverage gaps, respectively.
 
@@ -453,11 +448,11 @@ This function takes a few inputs *GenomicRanges* objects:
 
 All called genes overlap with intervals of nascent transcription, at that the transcribed intervals are usually wider than the genes. In particular, many genes have trailing "tails" of nascent transcription (known as readthrough, or RT, tails) immediately downstream from their PAS. The `process_nascent_intervals()` function combines the called genes with their RT tails. The outer borders of HC, MC and LC genes are extended to cover the whole transcription unit (at that, the original gene coordinates which correspond to the area of productive elongation are moved to the *thick* metadata column of the *GRanges* object).
 
-![](Fig_09.png)
+![](Fig_09.png){ width=100% }
 
 In addition, the area of productive elongation in MC and LC genes can be expanded along the up- and/or downstream intervals of nascent transcription, if they connect the gene to a sufficiently strong TSS and/or PAS (this behavior is controlled by the `extend_along_nascent`, the `extension_flanks` and the `min_score_2` arguments).
 
-![](Fig_10.png)
+![](Fig_10.png){ width=100% }
 
 Finally, intervals of nascent transcription which do not overlap with any called gene on the same strand and are longer than `min_lncrna_width`, are considered long non-coding RNAs (lncRNAs). If they overlap with strong TSS and/or PAS (the minimal TC score is controlled by the `min_score_2` argument), they are further refined (extended or split) to match the transcription initiation and termination landscape.
 
