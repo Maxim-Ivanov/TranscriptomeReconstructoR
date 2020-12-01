@@ -12,6 +12,16 @@ if (!"devtools" %in% rownames(installed.packages())) {
 }
 devtools::install_github("Maxim-Ivanov/TranscriptomeReconstructoR", build_vignettes = TRUE, ref = "main")
 ```
+If the Bioconductor dependencies were not resolved automatically by `devtools::install_github()`, please install the required Bioconductor packages manually:
+
+```{r, eval = FALSE}
+BiocManager::install(c("GenomicRanges", "GenomicAlignments", "rtracklayer", "BiocStyle"))
+```
+Linux users may need to resolve some additional dependencies to install `devtools`. For example, on Ubuntu 20.04:
+
+```{bash, eval = FALSE}
+sudo apt-get install libssl-dev libcurl4-openssl-dev libxml2-dev
+```
 
 Then load the installed package:
 
