@@ -29,7 +29,6 @@ Imports:
     methods
 Suggests:
     knitr,
-    rmarkdown,
-    BiocStyle
+    rmarkdown
 VignetteBuilder: knitr
 BiocViews: Software, Transcription, Transcriptomics, Sequencing, Annotation, GenomeBrowsers

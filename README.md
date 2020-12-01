@@ -15,15 +15,20 @@ devtools::install_github("Maxim-Ivanov/TranscriptomeReconstructoR", build_vignet
 If the Bioconductor dependencies were not resolved automatically by `devtools::install_github()`, please install the required Bioconductor packages manually:
 
 ```{r, eval = FALSE}
-BiocManager::install(c("GenomicRanges", "GenomicAlignments", "rtracklayer", "BiocStyle"))
+BiocManager::install(c("GenomicRanges", "GenomicAlignments", "rtracklayer"))
 ```
 Linux users may need to resolve some additional dependencies to install `devtools`. For example, on Ubuntu 20.04:
 
 ```{bash, eval = FALSE}
 sudo apt-get install libssl-dev libcurl4-openssl-dev libxml2-dev
 ```
+Mac users may need Xcode terminal tools to be installed (otherwise the `brio` dependency may fail to compile). In addition, the `collections` dependency may not compile properly on MacOS X El Capitan 10.11 and should be installed from the binary package on CRAN:
 
-Then load the installed package:
+```{r, eval = FALSE}
+install.packages("collections", type = "binary")
+```
+
+When *TranscriptomeReconstructoR* is finally installed, load it:
 
 ```{r, eval = FALSE}
 library(TranscriptomeReconstructoR)
