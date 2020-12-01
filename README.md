@@ -36,7 +36,7 @@ library(TranscriptomeReconstructoR)
 
 ## User manual
 
-The vignette contains everything you want to know about TranscriptomeReconstructoR:
+The vignette contains everything you want to know about *TranscriptomeReconstructoR*:
 
 * A simple usage scenario (the example dataset is provided);
 * Detailed description of the underlying algorithm;
