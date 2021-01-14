@@ -226,14 +226,12 @@ call_tu <- function(tx, clust_threshold) {
   par2 <- gr[S4Vectors::subjectHits(hits)]
   valid <- BiocGenerics::width(GenomicRanges::pintersect(par1, par2)) / BiocGenerics::width(GenomicRanges::punion(par1, par2)) >= clust_threshold # nested transcripts remain unmerged
   hits <- hits[valid]
-  used <- c(S4Vectors::queryHits(hits), S4Vectors::subjectHits(hits)) %>% BiocGenerics::unique()
-  if (length(used) > 0) {
-    out_1 <- gr[-used] %>% unname()
-  } else {
-    out_1 <- unname(gr)
-  }
+  used_idx <- c(S4Vectors::queryHits(hits), S4Vectors::subjectHits(hits)) %>% BiocGenerics::unique()
+  used <- vector("logical", length(gr))
+  used[used_idx] <- TRUE
+  out_1 <- gr[!used] %>% unname()
   if (length(out_1) > 0) {
-    S4Vectors::mcols(out_1)$revmap <- seq(1, length(gr))[-used] %>% S4Vectors::split(1:length(.)) %>% unname() %>% as("IntegerList")
+    S4Vectors::mcols(out_1)$revmap <- seq(1, length(gr))[!used] %>% S4Vectors::split(1:length(.)) %>% unname() %>% as("IntegerList")
   }
   # Merge tx with at least one strong overlap:
   mat <- hits %>% as.matrix() %>% unname()
