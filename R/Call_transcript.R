@@ -110,13 +110,17 @@ call_transcripts_and_genes <- function(long_reads, skip_minor_tx = 0.01, max_ove
   hml_tx <- c(hc_tx, mc_tx, lc_tx) %>% sort_grl()
   # Find more fusion reads among unused reads by overlap with called HC, MC and LC genes:
   fusion_idx <- reads_unused %>% range() %>% BiocGenerics::unlist() %>% find_fusion_tx(hml_genes, skip = FALSE)
-  reads_fusion <- reads_unused %>% `[`(fusion_idx) %>% BiocGenerics::unlist(use.names = FALSE) %>% `[`(S4Vectors::mcols(.)$complete) %>% S4Vectors::split(S4Vectors::mcols(.)$read_id) %>% sort_grl()
-  # Convert them to new fusion transcripts:
-  reads_fusion_dedup <- deduplicate_grl(reads_fusion)
-  reads_fusion_unl <- BiocGenerics::unlist(reads_fusion_dedup, use.names = FALSE)
-  S4Vectors::mcols(reads_fusion_unl)$type <- "Fusion"
-  reads_fusion_dedup <- BiocGenerics::relist(reads_fusion_unl, reads_fusion_dedup)
-  fusion_tx <- c(fusion_tx, reads_fusion_dedup) %>% unname() %>% sort_grl()
+  reads_fusion <- reads_unused %>% `[`(fusion_idx) %>% BiocGenerics::unlist(use.names = FALSE) %>% `[`(S4Vectors::mcols(.)$complete)
+  if (length(reads_fusion) > 0) {
+    reads_fusion <- reads_fusion %>% S4Vectors::split(S4Vectors::mcols(.)$read_id) %>% sort_grl()
+    # Convert them to new fusion transcripts:
+    reads_fusion_dedup <- deduplicate_grl(reads_fusion)
+    reads_fusion_unl <- BiocGenerics::unlist(reads_fusion_dedup, use.names = FALSE)
+    S4Vectors::mcols(reads_fusion_unl)$type <- "Fusion"
+    reads_fusion_dedup <- BiocGenerics::relist(reads_fusion_unl, reads_fusion_dedup)
+    fusion_tx <- c(fusion_tx, reads_fusion_dedup)
+  }
+  fusion_tx <- fusion_tx %>% unname() %>% sort_grl()
   fusion_tx_unl <- unlist(fusion_tx, use.names = FALSE)
   S4Vectors::mcols(fusion_tx_unl)$grp <- rep(1:length(fusion_tx), times = S4Vectors::elementNROWS(fusion_tx))
   fusion_tx <- BiocGenerics::relist(fusion_tx_unl, fusion_tx)
