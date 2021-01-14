@@ -227,15 +227,23 @@ call_tu <- function(tx, clust_threshold) {
   valid <- BiocGenerics::width(GenomicRanges::pintersect(par1, par2)) / BiocGenerics::width(GenomicRanges::punion(par1, par2)) >= clust_threshold # nested transcripts remain unmerged
   hits <- hits[valid]
   used <- c(S4Vectors::queryHits(hits), S4Vectors::subjectHits(hits)) %>% BiocGenerics::unique()
-  out_1 <- gr[-used] %>% unname()
+  if (length(used) > 0) {
+    out_1 <- gr[-used] %>% unname()
+  } else {
+    out_1 <- unname(gr)
+  }
   if (length(out_1) > 0) {
     S4Vectors::mcols(out_1)$revmap <- seq(1, length(gr))[-used] %>% S4Vectors::split(1:length(.)) %>% unname() %>% as("IntegerList")
   }
   # Merge tx with at least one strong overlap:
   mat <- hits %>% as.matrix() %>% unname()
-  clust <- cluster_indexes(mat)
-  group <- rep(1:length(clust), times = S4Vectors::elementNROWS(clust))
-  out_2 <- gr[BiocGenerics::unlist(clust)] %>% S4Vectors::split(group) %>% GenomicRanges::reduce() %>% BiocGenerics::unlist() %>% unname()
+  if (nrow(mat) > 0) {
+    clust <- cluster_indexes(mat)
+    group <- rep(1:length(clust), times = S4Vectors::elementNROWS(clust))
+    out_2 <- gr[BiocGenerics::unlist(clust)] %>% S4Vectors::split(group) %>% GenomicRanges::reduce() %>% BiocGenerics::unlist() %>% unname()
+  } else {
+    out_2 <- GRanges()
+  }
   if (length(out_2) > 0) {
     S4Vectors::mcols(out_2)$revmap <- clust %>% as("IntegerList")
   }
