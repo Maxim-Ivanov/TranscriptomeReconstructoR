@@ -137,6 +137,11 @@ extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-
       message("\t", sum(adj_read), " noTSS-noPAS ", mode, " were re-classified as complete;")
     }
     S4Vectors::mcols(all_exons)$complete <- S4Vectors::mcols(all_exons)$complete | rep(adj_read, times = S4Vectors::elementNROWS(grl))
+  } else {
+    S4Vectors::mcols(all_exons)$term_adj <- NA
+    S4Vectors::mcols(all_exons)$complete <- S4Vectors::mcols(all_exons)$over_tc == "both"
+    S4Vectors::mcols(all_exons)$last_adj <- NA
+    S4Vectors::mcols(all_exons)$first_adj <- NA
   }
   if (mode == "reads") {
     S4Vectors::mcols(all_exons)$grp_id <- NULL ###
