@@ -16,7 +16,8 @@
 #' The long read may be truncated, if the TSS/PAS summit is located inside of its terminal exon (however truncation to a length smaller than \code{trunc_limit} bp is disallowed).\cr
 #' @return \code{GRangesList} object containing the adjusted exons + some extra mcols.
 #' @export
-extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-100, 10), read_flanks_down = c(-50, 50), trunc_limit = 20, mode = "reads", verbose = isTRUE(mode == "reads")) {
+extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-100, 10), read_flanks_down = c(-50, 50), trunc_limit = 20, mode = "reads",
+                                             verbose = isTRUE(mode == "reads"), extend_free_exons = TRUE) {
   stopifnot(BiocGenerics::grepl("GRangesList", class(grl)))
   stopifnot(class(tss) == "GRanges" && class(pas) == "GRanges")
   stopifnot(is.numeric(read_flanks_up) && length(read_flanks_up) == 2 && read_flanks_up[[1]] %% 1 == 0 && read_flanks_up[[2]] %% 1 == 0)
@@ -79,69 +80,71 @@ extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-
   S4Vectors::mcols(all_exons)[!has_tss & has_pas, "over_tc"] <- "pas_only"
   # Also add read/tx width:
   S4Vectors::mcols(all_exons)$read_width <- rep(BiocGenerics::width(new_range), times = S4Vectors::elementNROWS(grl))
-  # Extend terminal exons of TSS-only and PAS-only reads/tx:
-  if (isTRUE(verbose)) {
-    message("Trying to extend terminal exons of TSS-only and PAS-only ", mode, "...")
+  if (isTRUE(extend_free_exons)) {
+    # Extend terminal exons of TSS-only and PAS-only reads/tx:
+    if (isTRUE(verbose)) {
+      message("Trying to extend terminal exons of TSS-only and PAS-only ", mode, "...")
+    }
+    fl_tbl <- S4Vectors::mcols(all_exons) %>% dplyr::as_tibble() %>% dplyr::filter(over_tc == "both")
+    tss_in_use <-  fl_tbl$tss_id %>% BiocGenerics::unique()
+    pas_in_use <- fl_tbl$pas_id %>% BiocGenerics::unique()
+    tss_only <- S4Vectors::mcols(all_exons)$over_tc == "tss_only" & !S4Vectors::mcols(all_exons)$tss_id %in% tss_in_use
+    pas_only <- S4Vectors::mcols(all_exons)$over_tc == "pas_only" & !S4Vectors::mcols(all_exons)$pas_id %in% pas_in_use
+    tss_only_adj <- all_exons[tss_only] %>% extend_terminal_exons(mode = "tss")
+    pas_only_adj <- all_exons[pas_only] %>% extend_terminal_exons(mode = "pas")
+    other_exons <- all_exons[!tss_only & !pas_only]
+    if (length(other_exons) > 0) {
+      S4Vectors::mcols(other_exons)$term_adj <- NA
+    }
+    all_exons <- c(other_exons, tss_only_adj, pas_only_adj) %>% `[`(BiocGenerics::order(S4Vectors::mcols(.)$exon_id))
+    # TSS_only and PAS_only reads/tx with extended terminal exons can be regarded as "complete":
+    adj_read <- BiocGenerics::tapply(S4Vectors::mcols(all_exons)$term_adj, S4Vectors::mcols(all_exons)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
+    S4Vectors::mcols(all_exons)$complete <- S4Vectors::mcols(all_exons)$over_tc == "both" | rep(adj_read, times = S4Vectors::elementNROWS(grl))
+    if (isTRUE(verbose)) {
+      message("\t", sum(adj_read), " TSS-only or PAS-only ", mode, " were re-classified as complete;")
+      # Extend terminal exons of noTSS-noPAS reads/tx:
+      message("Trying to extend terminal exons of noTSS-noPAS ", mode, "...")
+    }
+    trunc <- S4Vectors::mcols(all_exons)$over_tc == "no"
+    other_1 <- all_exons[!trunc]
+    if (length(other_1) > 0) {
+      S4Vectors::mcols(other_1)$last_adj <- NA
+      S4Vectors::mcols(other_1)$first_adj <- NA
+    }
+    exons_trunc <- all_exons[trunc]
+    reads_trunc <- S4Vectors::split(exons_trunc, S4Vectors::mcols(exons_trunc)$read_id)
+    range_trunc <- reads_trunc %>% range() %>% BiocGenerics::unlist()
+    # Group by overlap, not by TSS/PAS indexes:
+    groups <- GenomicRanges::reduce(range_trunc)
+    support <- GenomicRanges::countOverlaps(groups, range_trunc)
+    groups <- groups[support >= 2]
+    hits <- GenomicRanges::findOverlaps(exons_trunc, groups, type = "within")
+    other_2 <- exons_trunc[-S4Vectors::queryHits(hits)]
+    if (length(other_2) > 0) {
+      S4Vectors::mcols(other_2)$last_adj <- NA
+      S4Vectors::mcols(other_2)$first_adj <- NA
+    }
+    exons_trunc <- exons_trunc[S4Vectors::queryHits(hits)]
+    S4Vectors::mcols(exons_trunc)$grp_id <- S4Vectors::subjectHits(hits)
+    exons_trunc <- exons_trunc %>% extend_terminal_exons(mode = "tss", colname_grp = "grp_id", colname_out = "last_adj")
+    exons_trunc <- exons_trunc %>% extend_terminal_exons(mode = "pas", colname_grp = "grp_id", colname_out = "first_adj")
+    all_exons <- c(other_1, other_2, exons_trunc) %>% `[`(BiocGenerics::order(S4Vectors::mcols(.)$exon_id))
+    # NoTSS-noPAS reads/tx with both terminal exons extended are also "complete":
+    adj_last <- BiocGenerics::tapply(S4Vectors::mcols(all_exons)$last_adj, S4Vectors::mcols(all_exons)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
+    adj_first <- BiocGenerics::tapply(S4Vectors::mcols(all_exons)$first_adj, S4Vectors::mcols(all_exons)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
+    adj_read <- adj_last & adj_first
+    if (isTRUE(verbose)) {
+      message("\t", sum(adj_read), " noTSS-noPAS ", mode, " were re-classified as complete;")
+    }
+    S4Vectors::mcols(all_exons)$complete <- S4Vectors::mcols(all_exons)$complete | rep(adj_read, times = S4Vectors::elementNROWS(grl))
   }
-  fl_tbl <- S4Vectors::mcols(all_exons) %>% dplyr::as_tibble() %>% dplyr::filter(over_tc == "both")
-  tss_in_use <-  fl_tbl$tss_id %>% BiocGenerics::unique()
-  pas_in_use <- fl_tbl$pas_id %>% BiocGenerics::unique()
-  tss_only <- S4Vectors::mcols(all_exons)$over_tc == "tss_only" & !S4Vectors::mcols(all_exons)$tss_id %in% tss_in_use
-  pas_only <- S4Vectors::mcols(all_exons)$over_tc == "pas_only" & !S4Vectors::mcols(all_exons)$pas_id %in% pas_in_use
-  tss_only_adj <- all_exons[tss_only] %>% extend_terminal_exons(mode = "tss")
-  pas_only_adj <- all_exons[pas_only] %>% extend_terminal_exons(mode = "pas")
-  other_exons <- all_exons[!tss_only & !pas_only]
-  if (length(other_exons) > 0) {
-    S4Vectors::mcols(other_exons)$term_adj <- NA
-  }
-  all_exons_2 <- c(other_exons, tss_only_adj, pas_only_adj) %>% `[`(BiocGenerics::order(S4Vectors::mcols(.)$exon_id))
-  # TSS_only and PAS_only reads/tx with extended terminal exons can be regarded as "complete":
-  adj_read <- BiocGenerics::tapply(S4Vectors::mcols(all_exons_2)$term_adj, S4Vectors::mcols(all_exons_2)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
-  S4Vectors::mcols(all_exons_2)$complete <- S4Vectors::mcols(all_exons_2)$over_tc == "both" | rep(adj_read, times = S4Vectors::elementNROWS(grl))
-  if (isTRUE(verbose)) {
-    message("\t", sum(adj_read), " TSS-only or PAS-only ", mode, " were re-classified as complete;")
-    # Extend terminal exons of noTSS-noPAS reads/tx:
-    message("Trying to extend terminal exons of noTSS-noPAS ", mode, "...")
-  }
-  trunc <- S4Vectors::mcols(all_exons_2)$over_tc == "no"
-  other_1 <- all_exons_2[!trunc]
-  if (length(other_1) > 0) {
-    S4Vectors::mcols(other_1)$last_adj <- NA
-    S4Vectors::mcols(other_1)$first_adj <- NA
-  }
-  exons_trunc <- all_exons_2[trunc]
-  reads_trunc <- S4Vectors::split(exons_trunc, S4Vectors::mcols(exons_trunc)$read_id)
-  range_trunc <- reads_trunc %>% range() %>% BiocGenerics::unlist()
-  # Group by overlap, not by TSS/PAS indexes:
-  groups <- GenomicRanges::reduce(range_trunc)
-  support <- GenomicRanges::countOverlaps(groups, range_trunc)
-  groups <- groups[support >= 2]
-  hits <- GenomicRanges::findOverlaps(exons_trunc, groups, type = "within")
-  other_2 <- exons_trunc[-S4Vectors::queryHits(hits)]
-  if (length(other_2) > 0) {
-    S4Vectors::mcols(other_2)$last_adj <- NA
-    S4Vectors::mcols(other_2)$first_adj <- NA
-  }
-  exons_trunc <- exons_trunc[S4Vectors::queryHits(hits)]
-  S4Vectors::mcols(exons_trunc)$grp_id <- S4Vectors::subjectHits(hits)
-  exons_trunc <- exons_trunc %>% extend_terminal_exons(mode = "tss", colname_grp = "grp_id", colname_out = "last_adj")
-  exons_trunc <- exons_trunc %>% extend_terminal_exons(mode = "pas", colname_grp = "grp_id", colname_out = "first_adj")
-  all_exons_3 <- c(other_1, other_2, exons_trunc) %>% `[`(BiocGenerics::order(S4Vectors::mcols(.)$exon_id))
-  # NoTSS-noPAS reads/tx with both terminal exons extended are also "complete":
-  adj_last <- BiocGenerics::tapply(S4Vectors::mcols(all_exons_3)$last_adj, S4Vectors::mcols(all_exons_3)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
-  adj_first <- BiocGenerics::tapply(S4Vectors::mcols(all_exons_3)$first_adj, S4Vectors::mcols(all_exons_3)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
-  adj_read <- adj_last & adj_first
-  if (isTRUE(verbose)) {
-    message("\t", sum(adj_read), " noTSS-noPAS ", mode, " were re-classified as complete;")
-  }
-  S4Vectors::mcols(all_exons_3)$complete <- S4Vectors::mcols(all_exons_3)$complete | rep(adj_read, times = S4Vectors::elementNROWS(grl))
   if (mode == "reads") {
-    S4Vectors::mcols(all_exons_3)$grp_id <- NULL ###
-    out <- all_exons_3 %>% S4Vectors::split(S4Vectors::mcols(.)$read_id)
+    S4Vectors::mcols(all_exons)$grp_id <- NULL ###
+    out <- all_exons %>% S4Vectors::split(S4Vectors::mcols(.)$read_id)
   } else {
-    groups <- S4Vectors::mcols(all_exons_3)$read_id
-    S4Vectors::mcols(all_exons_3) <- old_mcols
-    out <- S4Vectors::split(all_exons_3, groups)
+    groups <- S4Vectors::mcols(all_exons)$read_id
+    S4Vectors::mcols(all_exons) <- old_mcols
+    out <- S4Vectors::split(all_exons, groups)
     names(out) <- old_names
   }
   return(out)
