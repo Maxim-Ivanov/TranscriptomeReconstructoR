@@ -17,7 +17,7 @@
 #' @return \code{GRangesList} object containing the adjusted exons + some extra mcols.
 #' @export
 extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-100, 10), read_flanks_down = c(-50, 50), trunc_limit = 20, mode = "reads",
-                                             verbose = isTRUE(mode == "reads"), extend_free_exons = TRUE) {
+                                             verbose = isTRUE(mode == "reads"), extend_along_guides = TRUE) {
   stopifnot(BiocGenerics::grepl("GRangesList", class(grl)))
   stopifnot(class(tss) == "GRanges" && class(pas) == "GRanges")
   stopifnot(is.numeric(read_flanks_up) && length(read_flanks_up) == 2 && read_flanks_up[[1]] %% 1 == 0 && read_flanks_up[[2]] %% 1 == 0)
@@ -25,6 +25,7 @@ extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-
   stopifnot(mode %in% c("reads", "transcripts"))
   stopifnot(is.numeric(trunc_limit) && length(trunc_limit) == 1 && trunc_limit %% 1 == 0 && trunc_limit > 0)
   stopifnot(is.logical(verbose) && length(verbose) == 1)
+  stopifnot(is.logical(extend_along_guides) && length(extend_along_guides) == 1)
   if (mode == "transcripts") {
     old_mcols <- grl %>% BiocGenerics::unlist(use.names = FALSE) %>% S4Vectors::mcols()
     old_names <- names(grl)
@@ -80,69 +81,62 @@ extend_long_reads_to_TSS_and_PAS <- function(grl, tss, pas, read_flanks_up = c(-
   S4Vectors::mcols(all_exons)[!has_tss & has_pas, "over_tc"] <- "pas_only"
   # Also add read/tx width:
   S4Vectors::mcols(all_exons)$read_width <- rep(BiocGenerics::width(new_range), times = S4Vectors::elementNROWS(grl))
-  if (isTRUE(extend_free_exons)) {
-    # Extend terminal exons of TSS-only and PAS-only reads/tx:
-    if (isTRUE(verbose)) {
-      message("Trying to extend terminal exons of TSS-only and PAS-only ", mode, "...")
-    }
-    fl_tbl <- S4Vectors::mcols(all_exons) %>% dplyr::as_tibble() %>% dplyr::filter(over_tc == "both")
-    tss_in_use <-  fl_tbl$tss_id %>% BiocGenerics::unique()
-    pas_in_use <- fl_tbl$pas_id %>% BiocGenerics::unique()
-    tss_only <- S4Vectors::mcols(all_exons)$over_tc == "tss_only" & !S4Vectors::mcols(all_exons)$tss_id %in% tss_in_use
-    pas_only <- S4Vectors::mcols(all_exons)$over_tc == "pas_only" & !S4Vectors::mcols(all_exons)$pas_id %in% pas_in_use
-    tss_only_adj <- all_exons[tss_only] %>% extend_terminal_exons(mode = "tss")
-    pas_only_adj <- all_exons[pas_only] %>% extend_terminal_exons(mode = "pas")
-    other_exons <- all_exons[!tss_only & !pas_only]
-    if (length(other_exons) > 0) {
-      S4Vectors::mcols(other_exons)$term_adj <- NA
-    }
-    all_exons <- c(other_exons, tss_only_adj, pas_only_adj) %>% `[`(BiocGenerics::order(S4Vectors::mcols(.)$exon_id))
-    # TSS_only and PAS_only reads/tx with extended terminal exons can be regarded as "complete":
-    adj_read <- BiocGenerics::tapply(S4Vectors::mcols(all_exons)$term_adj, S4Vectors::mcols(all_exons)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
-    S4Vectors::mcols(all_exons)$complete <- S4Vectors::mcols(all_exons)$over_tc == "both" | rep(adj_read, times = S4Vectors::elementNROWS(grl))
-    if (isTRUE(verbose)) {
-      message("\t", sum(adj_read), " TSS-only or PAS-only ", mode, " were re-classified as complete;")
-      # Extend terminal exons of noTSS-noPAS reads/tx:
-      message("Trying to extend terminal exons of noTSS-noPAS ", mode, "...")
-    }
-    trunc <- S4Vectors::mcols(all_exons)$over_tc == "no"
-    other_1 <- all_exons[!trunc]
-    if (length(other_1) > 0) {
-      S4Vectors::mcols(other_1)$last_adj <- NA
-      S4Vectors::mcols(other_1)$first_adj <- NA
-    }
-    exons_trunc <- all_exons[trunc]
-    reads_trunc <- S4Vectors::split(exons_trunc, S4Vectors::mcols(exons_trunc)$read_id)
-    range_trunc <- reads_trunc %>% range() %>% BiocGenerics::unlist()
-    # Group by overlap, not by TSS/PAS indexes:
-    groups <- GenomicRanges::reduce(range_trunc)
-    support <- GenomicRanges::countOverlaps(groups, range_trunc)
-    groups <- groups[support >= 2]
-    hits <- GenomicRanges::findOverlaps(exons_trunc, groups, type = "within")
-    other_2 <- exons_trunc[-S4Vectors::queryHits(hits)]
-    if (length(other_2) > 0) {
-      S4Vectors::mcols(other_2)$last_adj <- NA
-      S4Vectors::mcols(other_2)$first_adj <- NA
-    }
-    exons_trunc <- exons_trunc[S4Vectors::queryHits(hits)]
-    S4Vectors::mcols(exons_trunc)$grp_id <- S4Vectors::subjectHits(hits)
-    exons_trunc <- exons_trunc %>% extend_terminal_exons(mode = "tss", colname_grp = "grp_id", colname_out = "last_adj")
-    exons_trunc <- exons_trunc %>% extend_terminal_exons(mode = "pas", colname_grp = "grp_id", colname_out = "first_adj")
-    all_exons <- c(other_1, other_2, exons_trunc) %>% `[`(BiocGenerics::order(S4Vectors::mcols(.)$exon_id))
-    # NoTSS-noPAS reads/tx with both terminal exons extended are also "complete":
-    adj_last <- BiocGenerics::tapply(S4Vectors::mcols(all_exons)$last_adj, S4Vectors::mcols(all_exons)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
-    adj_first <- BiocGenerics::tapply(S4Vectors::mcols(all_exons)$first_adj, S4Vectors::mcols(all_exons)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
-    adj_read <- adj_last & adj_first
-    if (isTRUE(verbose)) {
-      message("\t", sum(adj_read), " noTSS-noPAS ", mode, " were re-classified as complete;")
-    }
-    S4Vectors::mcols(all_exons)$complete <- S4Vectors::mcols(all_exons)$complete | rep(adj_read, times = S4Vectors::elementNROWS(grl))
-  } else {
-    S4Vectors::mcols(all_exons)$term_adj <- NA
-    S4Vectors::mcols(all_exons)$complete <- S4Vectors::mcols(all_exons)$over_tc == "both"
-    S4Vectors::mcols(all_exons)$last_adj <- NA
-    S4Vectors::mcols(all_exons)$first_adj <- NA
+  # Extend terminal exons of TSS-only and PAS-only reads/tx:
+  if (isTRUE(verbose)) {
+    message("Trying to extend terminal exons of TSS-only and PAS-only ", mode, "...")
   }
+  fl_tbl <- S4Vectors::mcols(all_exons) %>% dplyr::as_tibble() %>% dplyr::filter(over_tc == "both")
+  tss_in_use <-  fl_tbl$tss_id %>% BiocGenerics::unique()
+  pas_in_use <- fl_tbl$pas_id %>% BiocGenerics::unique()
+  tss_only <- S4Vectors::mcols(all_exons)$over_tc == "tss_only" & !S4Vectors::mcols(all_exons)$tss_id %in% tss_in_use
+  pas_only <- S4Vectors::mcols(all_exons)$over_tc == "pas_only" & !S4Vectors::mcols(all_exons)$pas_id %in% pas_in_use
+  tss_only_adj <- all_exons[tss_only] %>% extend_terminal_exons(mode = "tss", extend_along_guides = extend_along_guides)
+  pas_only_adj <- all_exons[pas_only] %>% extend_terminal_exons(mode = "pas", extend_along_guides = extend_along_guides)
+  other_exons <- all_exons[!tss_only & !pas_only]
+  if (length(other_exons) > 0) {
+    S4Vectors::mcols(other_exons)$term_adj <- NA
+  }
+  all_exons <- c(other_exons, tss_only_adj, pas_only_adj) %>% `[`(BiocGenerics::order(S4Vectors::mcols(.)$exon_id))
+  # TSS_only and PAS_only reads/tx with extended terminal exons can be regarded as "complete":
+  adj_read <- BiocGenerics::tapply(S4Vectors::mcols(all_exons)$term_adj, S4Vectors::mcols(all_exons)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
+  S4Vectors::mcols(all_exons)$complete <- S4Vectors::mcols(all_exons)$over_tc == "both" | rep(adj_read, times = S4Vectors::elementNROWS(grl))
+  if (isTRUE(verbose)) {
+    message("\t", sum(adj_read), " TSS-only or PAS-only ", mode, " were re-classified as complete;")
+    # Extend terminal exons of noTSS-noPAS reads/tx:
+    message("Trying to extend terminal exons of noTSS-noPAS ", mode, "...")
+  }
+  trunc <- S4Vectors::mcols(all_exons)$over_tc == "no"
+  other_1 <- all_exons[!trunc]
+  if (length(other_1) > 0) {
+    S4Vectors::mcols(other_1)$last_adj <- NA
+    S4Vectors::mcols(other_1)$first_adj <- NA
+  }
+  exons_trunc <- all_exons[trunc]
+  reads_trunc <- S4Vectors::split(exons_trunc, S4Vectors::mcols(exons_trunc)$read_id)
+  range_trunc <- reads_trunc %>% range() %>% BiocGenerics::unlist()
+  # Group by overlap, not by TSS/PAS indexes:
+  groups <- GenomicRanges::reduce(range_trunc)
+  support <- GenomicRanges::countOverlaps(groups, range_trunc)
+  groups <- groups[support >= 2]
+  hits <- GenomicRanges::findOverlaps(exons_trunc, groups, type = "within")
+  other_2 <- exons_trunc[-S4Vectors::queryHits(hits)]
+  if (length(other_2) > 0) {
+    S4Vectors::mcols(other_2)$last_adj <- NA
+    S4Vectors::mcols(other_2)$first_adj <- NA
+  }
+  exons_trunc <- exons_trunc[S4Vectors::queryHits(hits)]
+  S4Vectors::mcols(exons_trunc)$grp_id <- S4Vectors::subjectHits(hits)
+  exons_trunc <- exons_trunc %>% extend_terminal_exons(mode = "tss", colname_grp = "grp_id", colname_out = "last_adj", extend_along_guides = extend_along_guides)
+  exons_trunc <- exons_trunc %>% extend_terminal_exons(mode = "pas", colname_grp = "grp_id", colname_out = "first_adj", extend_along_guides = extend_along_guides)
+  all_exons <- c(other_1, other_2, exons_trunc) %>% `[`(BiocGenerics::order(S4Vectors::mcols(.)$exon_id))
+  # NoTSS-noPAS reads/tx with both terminal exons extended are also "complete":
+  adj_last <- BiocGenerics::tapply(S4Vectors::mcols(all_exons)$last_adj, S4Vectors::mcols(all_exons)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
+  adj_first <- BiocGenerics::tapply(S4Vectors::mcols(all_exons)$first_adj, S4Vectors::mcols(all_exons)$read_id, any, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() %>% ifelse(is.na(.), FALSE, .)
+  adj_read <- adj_last & adj_first
+  if (isTRUE(verbose)) {
+    message("\t", sum(adj_read), " noTSS-noPAS ", mode, " were re-classified as complete;")
+  }
+  S4Vectors::mcols(all_exons)$complete <- S4Vectors::mcols(all_exons)$complete | rep(adj_read, times = S4Vectors::elementNROWS(grl))
   if (mode == "reads") {
     S4Vectors::mcols(all_exons)$grp_id <- NULL ###
     out <- all_exons %>% S4Vectors::split(S4Vectors::mcols(.)$read_id)
@@ -224,7 +218,9 @@ extend_reads <- function(exons, tc, mode, extend_to = "summit", flank_out, flank
 
 #------------------------------------------------------------------------------------------------------------------
 
-extend_terminal_exons <- function(exons, mode, colname_grp = paste0(mode, "_id"), colname_out = "term_adj") {
+extend_terminal_exons <- function(exons, mode, colname_grp = paste0(mode, "_id"), colname_out = "term_adj", extend_along_guides = TRUE) {
+  # If extent_along_guides == FALSE: only mark the longest (guide) exon in each group as "extended" (to re-classify the read as "complete");
+  # Do not extend other target exons along the guide exon;
   stopifnot(mode %in% c("tss", "pas"))
   stopifnot(colname_grp %in% c("tss_id", "pas_id", "grp_id"))
   if (mode == "tss") {
@@ -241,27 +237,32 @@ extend_terminal_exons <- function(exons, mode, colname_grp = paste0(mode, "_id")
   target_exons <- target_exons[BiocGenerics::order(grp1)]
   grp1 <- grp1[BiocGenerics::order(grp1)]
   guide <- BiocGenerics::tapply(S4Vectors::mcols(target_exons)$read_width, grp1, find_uniq_max, simplify = FALSE) %>% BiocGenerics::unlist() %>% unname() # it might be better to choose the shortest candidate...
-  guide_exons <- target_exons[guide]
-  if (mode == "tss") {
-    hits <- GenomicRanges::resize(target_exons, 1, "end") %>% GenomicRanges::findOverlaps(guide_exons)
+  if (isTRUE(extend_along_guides)) {
+    guide_exons <- target_exons[guide]
+    if (mode == "tss") {
+      hits <- GenomicRanges::resize(target_exons, 1, "end") %>% GenomicRanges::findOverlaps(guide_exons)
+    } else {
+      hits <- GenomicRanges::resize(target_exons, 1, "start") %>% GenomicRanges::findOverlaps(guide_exons)
+    }
+    grp2 <- S4Vectors::mcols(guide_exons)[, colname_grp]
+    valid <- grp1[S4Vectors::queryHits(hits)] == grp2[S4Vectors::subjectHits(hits)] # consider only overlaps within the group
+    hits <- hits[valid]
+    out2 <- target_exons[-S4Vectors::queryHits(hits)] # target exons which fall outside of the guide exon and therefore cannot be extended
+    par1 <- target_exons[S4Vectors::queryHits(hits)]
+    par2 <- guide_exons[S4Vectors::subjectHits(hits)]
+    if (mode == "tss") {
+      out3 <- GenomicRanges::punion(GenomicRanges::resize(par1, 1, "start"), GenomicRanges::resize(par2, 1, "end"), fill.gap = TRUE)
+    } else {
+      out3 <- GenomicRanges::punion(GenomicRanges::resize(par1, 1, "end"), GenomicRanges::resize(par2, 1, "start"), fill.gap = TRUE)
+    }
+    S4Vectors::mcols(out3) <- S4Vectors::mcols(par1)
   } else {
-    hits <- GenomicRanges::resize(target_exons, 1, "start") %>% GenomicRanges::findOverlaps(guide_exons)
+    out2 <- target_exons[!guide]
+    out3 <- target_exons[guide]
   }
-  grp2 <- S4Vectors::mcols(guide_exons)[, colname_grp]
-  valid <- grp1[S4Vectors::queryHits(hits)] == grp2[S4Vectors::subjectHits(hits)] # consider only overlaps within the group
-  hits <- hits[valid]
-  out2 <- target_exons[-S4Vectors::queryHits(hits)] # target exons which fall outside of the guide exon and therefore cannot be extended
   if (length(out2) > 0) {
     S4Vectors::mcols(out2)[, colname_out] <- FALSE
   }
-  par1 <- target_exons[S4Vectors::queryHits(hits)]
-  par2 <- guide_exons[S4Vectors::subjectHits(hits)]
-  if (mode == "tss") {
-    out3 <- GenomicRanges::punion(GenomicRanges::resize(par1, 1, "start"), GenomicRanges::resize(par2, 1, "end"), fill.gap = TRUE)
-  } else {
-    out3 <- GenomicRanges::punion(GenomicRanges::resize(par1, 1, "end"), GenomicRanges::resize(par2, 1, "start"), fill.gap = TRUE)
-  }
-  S4Vectors::mcols(out3) <- S4Vectors::mcols(par1)
   if (length(out3) > 0) {
     S4Vectors::mcols(out3)[, colname_out] <- TRUE
   }
