@@ -54,6 +54,7 @@ refine_transcripts_by_annotation <- function(hml_tx, annot_exons, tss, pas, fusi
   hml_tx <- extend_called_transcripts(hml_tx, annot_exons, tss, mode = "start", min_score_2 = min_score_2, min_tx_cov = min_tx_cov)
   hml_tx <- extend_called_transcripts(hml_tx, annot_exons, pas, mode = "end", min_score_2 = min_score_2, min_tx_cov = min_tx_cov)
   # Update HC/MC/LC classification:
+  # (observe that MC or LC transcript can increase its rank)
   hml_range <- hml_tx %>% range() %>% BiocGenerics::unlist(use.names = FALSE)
   start_in_tss <- GenomicRanges::resize(hml_range, 1, "start") %over% tss
   end_in_pas <- GenomicRanges::resize(hml_range, 1, "end") %over% pas
@@ -66,7 +67,7 @@ refine_transcripts_by_annotation <- function(hml_tx, annot_exons, tss, pas, fusi
   annot_start <- GenomicRanges::resize(annot_range, 1, "start")
   annot_end <- GenomicRanges::resize(annot_range, 1, "end")
   valid_tss <- tss[BiocGenerics::score(tss) >= min_score_2]
-  valid_pas <- pas[BiocGenerics::score(tss) >= min_score_2]
+  valid_pas <- pas[BiocGenerics::score(pas) >= min_score_2]
   annot_hc <- annot_exons[annot_start %over% valid_tss & annot_end %over% valid_pas]
   # Try to detect more fusion transcripts:
   hml_tu <- hml_tx %>% call_tu(clust_threshold = clust_threshold)
@@ -111,6 +112,7 @@ refine_transcripts_by_annotation <- function(hml_tx, annot_exons, tss, pas, fusi
   }
   hml_tx <- sort_grl(hml_tx)
   # Recalculate genes, generate unique gene IDs:
+  # (observe that MC or LC gene can increase its rank)
   hml_genes <- call_HC_MC_LC_genes(hml_tx, clust_threshold = clust_threshold, generate_ids = TRUE)
   # Update unique transcript IDs:
   hml_tx <- update_tx_id(hml_tx, hml_genes)
@@ -161,7 +163,7 @@ extend_called_transcripts <- function(hml_tx, annot_exons, tc, mode, min_score_2
   called_tx_border <- hml_tx %>% range() %>% BiocGenerics::unlist() %>% GenomicRanges::resize(1, mode)
   over_tc <- called_tx_border %over% tc
   out_1 <- hml_tx[over_tc]
-  other <- hml_tx[!over_tc] ####################################################### there can be some HC guys... Check where do they come from!
+  other <- hml_tx[!over_tc]
   if (length(other) == 0) {
     message("\tNo transcripts were extended towards ", tc_type, ";")
     names(hml_tx) <- old_names
