@@ -331,6 +331,7 @@ parallel_overlap_type <- function(gr1, gr2) {
 
 trim_by_down_or_upstream_features <- function(windows, features, mode, offset = 1, ignore.strand = FALSE) {
   stopifnot(mode %in% c("down", "up"))
+  old_names <- names(windows)
   S4Vectors::mcols(windows)$orig_order <- 1:length(windows) # enumerate windows
   if (offset > 0) {
     if (mode == "down") {
@@ -353,9 +354,9 @@ trim_by_down_or_upstream_features <- function(windows, features, mode, offset = 
   feat_par <- features[S4Vectors::subjectHits(hits)]
   over_type <- parallel_overlap_type(win_par, feat_par) # detect the type of overlap
   if (mode == "down") {
-    bad <- as.logical(BiocGenerics::tapply(over_type, list(S4Vectors::mcols(win_par)$orig_order), function(x) { any(x == "up") | any(x == "contains") }))
+    bad <- as.logical(BiocGenerics::tapply(over_type, list(S4Vectors::mcols(win_par)$orig_order), function(x) { any(x %in% c("up", "contains", "exact", "no_down")) }))
   } else if (mode == "up") {
-    bad <- as.logical(BiocGenerics::tapply(over_type, list(S4Vectors::mcols(win_par)$orig_order), function(x) { any(x == "down") | any(x == "contains") }))
+    bad <- as.logical(BiocGenerics::tapply(over_type, list(S4Vectors::mcols(win_par)$orig_order), function(x) { any(x %in% c("down", "contains", "exact", "no_up")) }))
   }
   out2 <- win_rem[bad] # exclude and save windows which overlap any feature in undesired orientation
   out2 <- GenomicRanges::resize(out2, width = 0) # trim such windows to zero width
@@ -386,6 +387,7 @@ trim_by_down_or_upstream_features <- function(windows, features, mode, offset = 
   out <- c(out1, out2, out3_trimmed) # combine all processed windows
   out <- out[BiocGenerics::order(S4Vectors::mcols(out)$orig_order)] # restore the original order
   S4Vectors::mcols(out)$orig_order <- NULL
+  names(out) <- old_names
   return(out)
 }
 
