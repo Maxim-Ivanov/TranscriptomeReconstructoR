@@ -120,18 +120,22 @@ call_transcripts_and_genes <- function(long_reads, skip_minor_tx = 0.01, max_ove
     reads_fusion_dedup <- BiocGenerics::relist(reads_fusion_unl, reads_fusion_dedup)
     fusion_tx <- c(fusion_tx, reads_fusion_dedup)
   }
-  fusion_tx <- fusion_tx %>% unname() %>% sort_grl()
-  fusion_tx_unl <- unlist(fusion_tx, use.names = FALSE)
-  S4Vectors::mcols(fusion_tx_unl)$grp <- rep(1:length(fusion_tx), times = S4Vectors::elementNROWS(fusion_tx))
-  fusion_tx <- BiocGenerics::relist(fusion_tx_unl, fusion_tx)
-  # Group fusion transcripts into "fusion TUs":
-  fusion_tu <- fusion_tx %>% call_tu(clust_threshold = clust_threshold) %>% skip_nested()
-  message("\t", length(fusion_tx), " fusion transcripts in ", length(fusion_tu), " fusion genes;")
-  S4Vectors::mcols(fusion_tu)$type <- "Fusion"
-  fusion_tu_id <- sprintf(paste0("%0", nchar(length(fusion_tu)), "i"), 1:length(fusion_tu))
-  S4Vectors::mcols(fusion_tu)$name <- BiocGenerics::paste(S4Vectors::mcols(fusion_tu)$type, "TU", fusion_tu_id, sep = "_")
-  # Generate unique IDs for fusion transcripts:
-  fusion_tx <- generate_tx_id(fusion_tx, fusion_tu)
+  if (length(fusion_tx) > 0) {
+    fusion_tx <- fusion_tx %>% unname() %>% sort_grl()
+    fusion_tx_unl <- unlist(fusion_tx, use.names = FALSE)
+    S4Vectors::mcols(fusion_tx_unl)$grp <- rep(1:length(fusion_tx), times = S4Vectors::elementNROWS(fusion_tx))
+    fusion_tx <- BiocGenerics::relist(fusion_tx_unl, fusion_tx)
+    # Group fusion transcripts into "fusion TUs":
+    fusion_tu <- fusion_tx %>% call_tu(clust_threshold = clust_threshold) %>% skip_nested()
+    message("\t", length(fusion_tx), " fusion transcripts in ", length(fusion_tu), " fusion genes;")
+    S4Vectors::mcols(fusion_tu)$type <- "Fusion"
+    fusion_tu_id <- sprintf(paste0("%0", nchar(length(fusion_tu)), "i"), 1:length(fusion_tu))
+    S4Vectors::mcols(fusion_tu)$name <- BiocGenerics::paste(S4Vectors::mcols(fusion_tu)$type, "TU", fusion_tu_id, sep = "_")
+    # Generate unique IDs for fusion transcripts:
+    fusion_tx <- generate_tx_id(fusion_tx, fusion_tu)
+  } else {
+    fusion_tu <- GRangesList()
+  }
   S4Vectors::mcols(hml_genes)$revmap <- NULL
   S4Vectors::mcols(fusion_tu)$revmap <- NULL
   out <- list("hml_genes" = hml_genes, "hml_tx" = hml_tx, "fusion_genes" = fusion_tu, "fusion_tx" = fusion_tx, "reads_free" = reads_free)
