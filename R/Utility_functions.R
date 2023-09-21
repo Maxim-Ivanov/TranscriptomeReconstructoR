@@ -33,7 +33,9 @@ save_GRanges_as_bedGraph <- function(gr, filepath, colname = "score") {
 #' @section Details:
 #' This function does the same work as \code{rtracklayer::export(format = "BED")},
 #' with the added benefit that the \code{S4Vectors::mcols(grl)$score} is properly exported.\cr
-#' If \code{name_in_mcols == TRUE}, then the \code{S4Vectors::mcols(grl)$name} is exported as range names (otherwise the \code{names(grl)} is used).
+#' If \code{name_in_mcols == TRUE}, then the \code{S4Vectors::mcols(grl)$name} is exported as range names (otherwise the \code{names(grl)} is used).\cr
+#' Observe that the \code{default_score = "."} and \code{default_itemRgb = "."} are OK for IGV browser only.
+#' The UCSC browser wants numeric values instead, e.g. \code{default_score = "0"} and \code{default_itemRgb = "0,0,0"}
 #' @export
 write_grl_as_bed12 <- function(grl, filename, name_in_mcols = FALSE) {
   stopifnot(BiocGenerics::grepl("GRangesList", class(grl)))
@@ -82,6 +84,9 @@ write_grl_as_bed12 <- function(grl, filename, name_in_mcols = FALSE) {
   blockCount <- S4Vectors::elementNROWS(grl)
   blockSizes <- BiocGenerics::width(grl) %>% BiocGenerics::lapply(stringr::str_c, collapse = ",") %>% BiocGenerics::unlist()
   blockStarts <- BiocGenerics::start(grl) %>% `-`(BiocGenerics::start(gr)) %>% BiocGenerics::lapply(stringr::str_c, collapse = ",") %>% BiocGenerics::unlist()
+  # Ensure zero offset (bugfix 2023-09-21):
+  chromStart <- chromStart - 1
+  thickStart <- thickStart - 1
   tbl <- dplyr::tibble(chrom, chromStart, chromEnd, name, score, strand, thickStart, thickEnd, itemRgb, blockCount, blockSizes, blockStarts)
   tbl <- dplyr::arrange(tbl, chrom, chromStart, chromEnd)
   readr::write_tsv(tbl, filename, col_names = FALSE)
