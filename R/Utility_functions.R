@@ -222,7 +222,8 @@ check_gr_up_down <- function(g1, g2, offset = 1) {
   grey <- GenomicRanges::resize(g1, offset, "start")
   S4Vectors::mcols(g2)$idx <- 1:length(g2)
   g2 <- GenomicRanges::resize(g2, 1, "start")
-  over <- g2 %over% grey
+  #over <- g2 %over% grey
+  over <- poverlaps_gr(g2, grey) ### bugfixed on 2023-09-26
   out_1 <- g2[over]
   if (length(out_1) > 0) {
     S4Vectors::mcols(out_1)$decision <- "over"
