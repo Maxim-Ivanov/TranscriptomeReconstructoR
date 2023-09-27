@@ -1,6 +1,6 @@
 Package: TranscriptomeReconstructoR
 Title: Data-driven Annotation of the Transcriptome
-Version: 0.9.0
+Version: 1.0.0
 Authors@R: 
     person(given = "Maxim",
            family = "Ivanov",
